@@ -1,0 +1,20 @@
+export const MAHJONG_SOUL_RANKED_4P = {
+  id: "mahjong-soul-ranked-4p",
+  startingPoints: 25000,
+  targetPoints: 30000,
+  returnPoints: 25000,
+  uma: [15, 5, -5, -15],
+  redFives: true,
+  openTanyao: true,
+  atozuke: true,
+  kuikae: false,
+  localYaku: false,
+  kiriageMangan: false,
+  kazoeYakuman: true,
+  doubleRon: true,
+  tripleRon: true,
+  tripleRonAbortiveDraw: false,
+  tobiAtNegative: true,
+  tobiAtZero: false,
+  riichiMinimumScore: 1000
+} as const;
