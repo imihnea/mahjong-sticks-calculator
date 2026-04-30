@@ -45,7 +45,11 @@ export function TableView(props: TableViewProps) {
             <strong>{player.score}</strong>
             {player.isDealer ? <span className="dealer-badge">Dealer</span> : null}
             {player.riichi ? <span className="riichi-badge">Riichi</span> : null}
-            <button onClick={() => props.onRiichi(player.id)} disabled={player.riichi}>
+            <button
+              aria-label={`Declare riichi for ${player.name}`}
+              onClick={() => props.onRiichi(player.id)}
+              disabled={player.riichi}
+            >
               Riichi
             </button>
           </article>

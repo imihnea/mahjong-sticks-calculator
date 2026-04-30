@@ -8,17 +8,40 @@ import { NewGamePanel } from "./NewGamePanel";
 import { TableView } from "./TableView";
 
 export function AppShell() {
-  const [game, setGame] = useState<GameState | null>(null);
+  const [game, setGame] = useState<GameState | null | undefined>(undefined);
 
   useEffect(() => {
-    void loadSavedGame().then(setGame).catch(() => undefined);
+    let isMounted = true;
+
+    void loadSavedGame()
+      .then((savedGame) => {
+        if (isMounted) setGame(savedGame);
+      })
+      .catch(() => {
+        if (isMounted) setGame(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
     if (game) void saveGame(game).catch(() => undefined);
   }, [game]);
 
-  if (!game) {
+  if (game === undefined) {
+    return (
+      <main className="app-frame">
+        <section className="loading-state" aria-live="polite">
+          <p className="eyebrow">Mahjong Soul Ranked 4P</p>
+          <h1>Loading saved table</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (game === null) {
     return (
       <main className="app-frame">
         <NewGamePanel
@@ -36,7 +59,7 @@ export function AppShell() {
         onWin={() => undefined}
         onDraw={() => undefined}
         onAbortiveDraw={() => undefined}
-        onRiichi={(playerId) => setGame(declareRiichi(game, playerId))}
+        onRiichi={(playerId) => setGame((current) => (current ? declareRiichi(current, playerId) : current))}
       />
     </main>
   );
