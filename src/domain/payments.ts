@@ -45,10 +45,9 @@ export function tsumoDeltas(input: {
   assertSeatIndex(input.dealerIndex);
   assertNonNegativeInteger(input.riichiSticks, "Riichi sticks");
   assertPayment(input.childPays);
-  if (input.winnerIndex === input.dealerIndex) {
-    throw new Error("Dealer payment is not used when the winner is dealer.");
+  if (input.winnerIndex !== input.dealerIndex) {
+    assertPayment(input.dealerPays);
   }
-  assertPayment(input.dealerPays);
   assertNonNegativeInteger(input.honba, "Honba");
 
   const deltas: ScoreDelta[] = [];

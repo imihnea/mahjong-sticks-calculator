@@ -26,6 +26,15 @@ describe("payments", () => {
     ]);
   });
 
+  it("creates dealer tsumo deltas", () => {
+    expect(tsumoDeltas({ winnerIndex: 0, dealerIndex: 0, dealerPays: 0, childPays: 4000, honba: 1, riichiSticks: 1 })).toEqual([
+      { playerIndex: 0, delta: 13300 },
+      { playerIndex: 1, delta: -4100 },
+      { playerIndex: 2, delta: -4100 },
+      { playerIndex: 3, delta: -4100 }
+    ]);
+  });
+
   it("applies exhaustive draw tenpai/noten payments", () => {
     expect(exhaustiveDrawDeltas([0], 4)).toEqual([
       { playerIndex: 0, delta: 3000 },
@@ -60,9 +69,6 @@ describe("payments", () => {
   });
 
   it("rejects impossible tsumo payment inputs", () => {
-    expect(() => tsumoDeltas({ winnerIndex: 0, dealerIndex: 0, dealerPays: 4000, childPays: 2000, honba: 0, riichiSticks: 0 })).toThrow(
-      "Dealer payment is not used when the winner is dealer."
-    );
     expect(() => tsumoDeltas({ winnerIndex: 2, dealerIndex: 0, dealerPays: 4050, childPays: 2000, honba: 0, riichiSticks: 0 })).toThrow(
       "Payment must be a positive multiple of 100."
     );
