@@ -160,6 +160,102 @@ h1 {
   min-width: 126px;
 }
 
+.modal-surface,
+.result-panel {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(247, 241, 223, 0.26);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+.modal-surface h2,
+.result-panel h2,
+.result-panel h3,
+.result-panel p {
+  margin: 0;
+}
+
+.modal-surface label {
+  display: grid;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.modal-surface input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+  color: var(--ink);
+}
+
+.modal-surface button,
+.result-panel button {
+  border-color: var(--line);
+  background: var(--felt-dark);
+  color: var(--paper);
+}
+
+.modal-surface button:hover:not(:disabled),
+.result-panel button:hover:not(:disabled) {
+  background: var(--felt);
+}
+
+.result-panel article {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-panel h3,
+.result-panel strong {
+  overflow-wrap: anywhere;
+}
+
+.stick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stick {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: white;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stick-10000 {
+  border-color: #303030;
+}
+
+.stick-5000 {
+  border-color: #d94836;
+}
+
+.stick-1000 {
+  border-color: #2457a6;
+}
+
+.stick-100 {
+  border-color: #d6a526;
+}
+
 .players-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
