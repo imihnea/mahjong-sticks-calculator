@@ -17,6 +17,8 @@ export function cameraUnavailableMessage(isSecureContext: boolean): string {
 export function useCameraCapture() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
+  const requestGenerationRef = useRef(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +31,7 @@ export function useCameraCapture() {
 
   const start = useCallback(async () => {
     setError(null);
+    const requestGeneration = ++requestGenerationRef.current;
 
     if (!supportsCameraCapture(navigator)) {
       setError(cameraUnavailableMessage(window.isSecureContext));
@@ -40,6 +43,10 @@ export function useCameraCapture() {
         video: { facingMode: "environment" },
         audio: false
       });
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       stopCurrentStream();
       streamRef.current = nextStream;
       setStream(nextStream);
@@ -50,11 +57,19 @@ export function useCameraCapture() {
   }, [stopCurrentStream]);
 
   const stop = useCallback(() => {
+    requestGenerationRef.current += 1;
     stopCurrentStream();
     setError(null);
   }, [stopCurrentStream]);
 
-  useEffect(() => stopCurrentStream, [stopCurrentStream]);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+      stopCurrentStream();
+    },
+    [stopCurrentStream]
+  );
 
   return { videoRef, stream, error, start, stop };
 }

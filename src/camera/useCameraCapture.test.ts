@@ -76,6 +76,55 @@ describe("camera helpers", () => {
     });
     expect(result.current.error).toBeNull();
   });
+
+  it("stops a pending stream if capture resolves after stop", async () => {
+    const lateStream = createMockStream();
+    let resolveCapture!: (stream: MediaStream) => void;
+    const getUserMedia = vi.fn<Navigator["mediaDevices"]["getUserMedia"]>().mockReturnValue(
+      new Promise((resolve) => {
+        resolveCapture = resolve;
+      })
+    );
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    vi.stubGlobal("isSecureContext", true);
+    const { result } = renderHook(() => useCameraCapture());
+
+    void act(() => {
+      void result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+    });
+    await act(async () => {
+      resolveCapture(lateStream.stream);
+    });
+
+    expect(lateStream.stop).toHaveBeenCalledTimes(1);
+    expect(result.current.stream).toBeNull();
+  });
+
+  it("stops a pending stream if capture resolves after unmount", async () => {
+    const lateStream = createMockStream();
+    let resolveCapture!: (stream: MediaStream) => void;
+    const getUserMedia = vi.fn<Navigator["mediaDevices"]["getUserMedia"]>().mockReturnValue(
+      new Promise((resolve) => {
+        resolveCapture = resolve;
+      })
+    );
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    vi.stubGlobal("isSecureContext", true);
+    const { result, unmount } = renderHook(() => useCameraCapture());
+
+    void act(() => {
+      void result.current.start();
+    });
+    unmount();
+    await act(async () => {
+      resolveCapture(lateStream.stream);
+    });
+
+    expect(lateStream.stop).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createMockStream() {
