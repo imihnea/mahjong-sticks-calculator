@@ -52,6 +52,9 @@ export function useCameraCapture() {
       setStream(nextStream);
       if (videoRef.current) videoRef.current.srcObject = nextStream;
     } catch {
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
+        return;
+      }
       setError(cameraUnavailableMessage(window.isSecureContext));
     }
   }, [stopCurrentStream]);
@@ -63,10 +66,14 @@ export function useCameraCapture() {
   }, [stopCurrentStream]);
 
   useEffect(
-    () => () => {
-      mountedRef.current = false;
-      requestGenerationRef.current += 1;
-      stopCurrentStream();
+    () => {
+      mountedRef.current = true;
+
+      return () => {
+        mountedRef.current = false;
+        requestGenerationRef.current += 1;
+        stopCurrentStream();
+      };
     },
     [stopCurrentStream]
   );

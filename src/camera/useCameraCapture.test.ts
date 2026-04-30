@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { createElement, StrictMode, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cameraUnavailableMessage, supportsCameraCapture, useCameraCapture } from "./useCameraCapture";
 
@@ -125,7 +126,71 @@ describe("camera helpers", () => {
 
     expect(lateStream.stop).toHaveBeenCalledTimes(1);
   });
+
+  it("does not set a stale error if capture rejects after stop", async () => {
+    let rejectCapture!: (error: Error) => void;
+    const getUserMedia = vi.fn<Navigator["mediaDevices"]["getUserMedia"]>().mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectCapture = reject;
+      })
+    );
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    vi.stubGlobal("isSecureContext", true);
+    const { result } = renderHook(() => useCameraCapture());
+
+    void act(() => {
+      void result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+    });
+    await act(async () => {
+      rejectCapture(new Error("denied"));
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it("does not update state if capture rejects after unmount", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let rejectCapture!: (error: Error) => void;
+    const getUserMedia = vi.fn<Navigator["mediaDevices"]["getUserMedia"]>().mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectCapture = reject;
+      })
+    );
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    vi.stubGlobal("isSecureContext", true);
+    const { result, unmount } = renderHook(() => useCameraCapture());
+
+    void act(() => {
+      void result.current.start();
+    });
+    unmount();
+    await act(async () => {
+      rejectCapture(new Error("denied"));
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("accepts a stream under React StrictMode", async () => {
+    const activeStream = createMockStream();
+    mockGetUserMedia(activeStream);
+    const { result } = renderHook(() => useCameraCapture(), { wrapper: strictModeWrapper });
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.stream).toBe(activeStream.stream);
+    expect(activeStream.stop).not.toHaveBeenCalled();
+  });
 });
+
+function strictModeWrapper({ children }: { children: ReactNode }) {
+  return createElement(StrictMode, null, children);
+}
 
 function createMockStream() {
   const stop = vi.fn();
