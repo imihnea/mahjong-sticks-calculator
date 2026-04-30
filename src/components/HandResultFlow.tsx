@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { applyHonba, nearestWinnerForRiichiDeposit } from "@/domain/payments";
 import { scoreWinEntry, validateWinEntry } from "@/domain/scoring";
-import type { AbortiveDrawType, GameState, PlayerId, Tile, WinEntry, WinType } from "@/domain/types";
+import type { AbortiveDrawType, GameState, PlayerId, SeatWind, Tile, WinEntry, WinType } from "@/domain/types";
 import { ResultPanel } from "./ResultPanel";
 import { TileEditor } from "./TileEditor";
 
@@ -39,7 +39,7 @@ export function HandResultFlow({
   const [tenpaiPlayerIds, setTenpaiPlayerIds] = useState<PlayerId[]>([]);
   const [result, setResult] = useState<{
     transfers: Array<{ from: string; to: string; amount: number }>;
-    inventories: Array<{ playerName: string; score: number }>;
+    inventories: Array<{ playerName: string; score: number; seatWind: SeatWind }>;
   } | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -203,7 +203,7 @@ async function applyScoredWin(input: {
   setIsApplying: (isApplying: boolean) => void;
   setResult: (result: {
     transfers: Array<{ from: string; to: string; amount: number }>;
-    inventories: Array<{ playerName: string; score: number }>;
+    inventories: Array<{ playerName: string; score: number; seatWind: SeatWind }>;
   }) => void;
 }) {
   const entry = createProvisionalWinEntry(input.game, {
@@ -238,7 +238,7 @@ async function applyScoredWin(input: {
 
     input.setResult({
       transfers: transfersFromPayments(input.game, payments),
-      inventories: nextGame.players.map((player) => ({ playerName: player.name, score: player.score }))
+      inventories: nextGame.players.map((player) => ({ playerName: player.name, score: player.score, seatWind: player.seatWind }))
     });
   } catch (error) {
     input.setApplyError(error instanceof Error ? error.message : "Winning hand could not be applied.");

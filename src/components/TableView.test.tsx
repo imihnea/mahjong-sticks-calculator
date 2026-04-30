@@ -35,6 +35,10 @@ describe("TableView", () => {
       expect(within(seat as HTMLElement).getByText(wind)).toBeInTheDocument();
       expect(within(seat as HTMLElement).getByText("25000")).toBeInTheDocument();
     });
+    expect(screen.getByLabelText("East seat")).toHaveClass("player-seat-east");
+    expect(screen.getByLabelText("South seat")).toHaveClass("player-seat-south");
+    expect(screen.getByLabelText("West seat")).toHaveClass("player-seat-west");
+    expect(screen.getByLabelText("North seat")).toHaveClass("player-seat-north");
 
     ["Roll dice", "Win", "Draw", "Abortive draw", "Undo", "New game"].forEach((name) => {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();

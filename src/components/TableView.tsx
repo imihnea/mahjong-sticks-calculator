@@ -19,7 +19,8 @@ export function TableView(props: TableViewProps) {
 
   return (
     <section className="table-view" aria-label="Mahjong table">
-      <div className="table-center">
+      <div className="table-cross">
+        <div className="table-center">
         <p className="eyebrow">{game.gameLength === "east" ? "East game" : "South game"}</p>
         <h1>
           {seatWindLabel(game.roundWind)} {game.handNumber}
@@ -38,11 +39,9 @@ export function TableView(props: TableViewProps) {
           <button onClick={props.onUndo} disabled={game.undoStack.length === 0}>Undo</button>
           <button onClick={props.onNewGame}>New game</button>
         </div>
-      </div>
-
-      <div className="players-grid">
+        </div>
         {game.players.map((player) => (
-          <article className={`player-seat player-seat-${player.seatWind}`} key={player.id}>
+          <article className={`player-seat player-seat-${player.seatWind}`} aria-label={`${seatWindLabel(player.seatWind)} seat`} key={player.id}>
             <div>
               <h2>{player.name}</h2>
               <p>{seatWindLabel(player.seatWind)}</p>

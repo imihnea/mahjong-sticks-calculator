@@ -1,11 +1,12 @@
 "use client";
 
 import { createStickInventory, describeTransferSticks } from "@/domain/sticks";
+import type { SeatWind } from "@/domain/types";
 import { StickIcon } from "./StickIcon";
 
 interface ResultPanelProps {
   transfers: Array<{ from: string; to: string; amount: number }>;
-  inventories: Array<{ playerName: string; score: number }>;
+  inventories: Array<{ playerName: string; score: number; seatWind: SeatWind }>;
   onClose: () => void;
 }
 
@@ -26,6 +27,36 @@ export function ResultPanel({ transfers, inventories, onClose }: ResultPanelProp
           </article>
         );
       })}
+
+      <h2>Payment by player</h2>
+      <div className="payment-cross">
+        {inventories.map((inventory) => {
+          const outgoing = transfers.filter((transfer) => transfer.from === inventory.playerName);
+          const incoming = transfers.filter((transfer) => transfer.to === inventory.playerName);
+          return (
+            <article
+              aria-label={`${inventory.playerName} payment summary`}
+              className={`payment-seat payment-seat-${inventory.seatWind}`}
+              key={`${inventory.playerName}-${inventory.seatWind}`}
+            >
+              <h3>{inventory.playerName}</h3>
+              {outgoing.length === 0 && incoming.length === 0 ? <p>No sticks now.</p> : null}
+              {outgoing.map((transfer, index) => (
+                <div className="stick-task" key={`give-${transfer.to}-${transfer.amount}-${index}`}>
+                  <strong>Give to {transfer.to}</strong>
+                  <StickSet amount={transfer.amount} />
+                </div>
+              ))}
+              {incoming.map((transfer, index) => (
+                <div className="stick-task stick-task-receive" key={`receive-${transfer.from}-${transfer.amount}-${index}`}>
+                  <strong>Receive from {transfer.from}</strong>
+                  <StickSet amount={transfer.amount} />
+                </div>
+              ))}
+            </article>
+          );
+        })}
+      </div>
 
       <h2>Stick inventory</h2>
       {inventories.map((inventory) => {
@@ -49,5 +80,17 @@ export function ResultPanel({ transfers, inventories, onClose }: ResultPanelProp
       })}
       <button onClick={onClose}>Close</button>
     </section>
+  );
+}
+
+function StickSet({ amount }: { amount: number }) {
+  const sticks = describeTransferSticks(amount).give;
+  return (
+    <div className="stick-row">
+      <StickIcon value={10000} count={sticks.tenThousand} />
+      <StickIcon value={5000} count={sticks.fiveThousand} />
+      <StickIcon value={1000} count={sticks.thousand} />
+      <StickIcon value={100} count={sticks.hundred} />
+    </div>
   );
 }

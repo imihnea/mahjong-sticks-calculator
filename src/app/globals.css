@@ -76,6 +76,32 @@ button:disabled {
   justify-items: center;
 }
 
+.name-grid {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.name-grid label {
+  display: grid;
+  gap: 6px;
+  color: rgba(247, 241, 223, 0.86);
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.name-grid input {
+  min-height: 44px;
+  border: 1px solid rgba(247, 241, 223, 0.32);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: rgba(247, 241, 223, 0.96);
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   font-size: 0.78rem;
@@ -92,13 +118,25 @@ h1 {
 }
 
 .table-view {
-  width: min(100%, 980px);
+  width: min(100%, 1120px);
   display: grid;
   gap: 16px;
   color: var(--paper);
 }
 
+.table-cross {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.35fr) minmax(180px, 1fr);
+  grid-template-areas:
+    ". west ."
+    "north center south"
+    ". east .";
+  align-items: center;
+  gap: 12px;
+}
+
 .table-center {
+  grid-area: center;
   display: grid;
   gap: 14px;
   justify-items: center;
@@ -162,7 +200,7 @@ h1 {
 
 .modal-surface,
 .result-panel {
-  width: min(100%, 560px);
+  width: min(100%, 760px);
   display: grid;
   gap: 12px;
   padding: 18px;
@@ -325,6 +363,46 @@ h1 {
   gap: 6px;
 }
 
+.payment-cross {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    ". west ."
+    "north . south"
+    ". east .";
+  gap: 10px;
+}
+
+.payment-seat {
+  min-width: 0;
+}
+
+.payment-seat-east {
+  grid-area: east;
+}
+
+.payment-seat-south {
+  grid-area: south;
+}
+
+.payment-seat-west {
+  grid-area: west;
+}
+
+.payment-seat-north {
+  grid-area: north;
+}
+
+.stick-task {
+  display: grid;
+  gap: 6px;
+}
+
+.stick-task-receive {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+
 .stick {
   display: inline-flex;
   min-height: 28px;
@@ -352,13 +430,6 @@ h1 {
 
 .stick-100 {
   border-color: #d6a526;
-}
-
-.players-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-areas: "east south west north";
-  gap: 12px;
 }
 
 .player-seat {
@@ -452,11 +523,19 @@ h1 {
     font-size: 2.35rem;
   }
 
-  .players-grid {
+  .table-cross {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      ". west ."
+      "north center south"
+      ". east .";
+  }
+
+  .payment-cross {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
-      "east south"
-      "west north";
+      "west north"
+      "south east";
   }
 }
 
@@ -478,13 +557,27 @@ h1 {
     font-size: 2rem;
   }
 
-  .players-grid {
+  .name-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-cross {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "east"
-      "south"
       "west"
-      "north";
+      "north"
+      "center"
+      "south"
+      "east";
+  }
+
+  .payment-cross {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "west"
+      "north"
+      "south"
+      "east";
   }
 
   .action-row button {
