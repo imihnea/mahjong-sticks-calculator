@@ -23,6 +23,7 @@ export type ScoreBreakdown =
 export function validateWinEntry(entry: WinEntry): string[] {
   const errors: string[] = [];
   const tiles = [...entry.concealedTiles, entry.winningTile, ...entry.melds.flatMap((meld) => meld.tiles)];
+  const indicatorTiles = [...entry.doraIndicators, ...entry.uraDoraIndicators];
   const effectiveTileCount =
     entry.concealedTiles.length + 1 + entry.melds.reduce((total, meld) => total + effectiveMeldTileCount(meld.type), 0);
 
@@ -31,6 +32,10 @@ export function validateWinEntry(entry: WinEntry): string[] {
   }
 
   for (const tile of tiles) {
+    errors.push(...validateTile(tile));
+  }
+
+  for (const tile of indicatorTiles) {
     errors.push(...validateTile(tile));
   }
 
@@ -108,7 +113,9 @@ function tileKey(tile: Tile): string {
 function validateTile(tile: Tile): string[] {
   const errors: string[] = [];
 
-  if (tile.suit === "honor") {
+  if (!isTileSuit(tile.suit)) {
+    errors.push("Tile suit must be man, pin, sou, or honor.");
+  } else if (tile.suit === "honor") {
     if (!Number.isInteger(tile.value) || tile.value < 1 || tile.value > 7) {
       errors.push("Honor tiles must have value 1-7.");
     }
@@ -125,6 +132,11 @@ function validateTile(tile: Tile): string[] {
 
 function validateMeld(meld: WinEntry["melds"][number]): string[] {
   const errors: string[] = [];
+  if (!isMeldType(meld.type)) {
+    errors.push("Meld type is invalid.");
+    return errors;
+  }
+
   const expectedCount = meld.type === "open-kan" || meld.type === "closed-kan" || meld.type === "added-kan" ? 4 : 3;
 
   if (meld.tiles.length !== expectedCount) {
@@ -154,5 +166,13 @@ function validateMeld(meld: WinEntry["melds"][number]): string[] {
 }
 
 function effectiveMeldTileCount(type: WinEntry["melds"][number]["type"]): number {
-  return type === "open-kan" || type === "closed-kan" || type === "added-kan" ? 3 : 3;
+  return isMeldType(type) ? 3 : 0;
+}
+
+function isTileSuit(suit: string): suit is Tile["suit"] {
+  return suit === "man" || suit === "pin" || suit === "sou" || suit === "honor";
+}
+
+function isMeldType(type: string): type is WinEntry["melds"][number]["type"] {
+  return type === "chi" || type === "pon" || type === "open-kan" || type === "closed-kan" || type === "added-kan";
 }

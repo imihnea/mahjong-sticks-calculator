@@ -75,6 +75,7 @@ describe("scoring adapter", () => {
   it("rejects malformed tiles and red fives", () => {
     expect(validateWinEntry(withWinningTile({ suit: "honor", value: 8 }))).toContain("Honor tiles must have value 1-7.");
     expect(validateWinEntry(withWinningTile({ suit: "man", value: 0 }))).toContain("Suit tiles must have value 1-9.");
+    expect(validateWinEntry(withWinningTile({ suit: "flower", value: 1 } as unknown as Tile))).toContain("Tile suit must be man, pin, sou, or honor.");
     expect(validateWinEntry(withWinningTile({ suit: "honor", value: 1, red: true }))).toContain("Only suit fives can be red.");
     expect(validateWinEntry(withWinningTile({ suit: "pin", value: 4, red: true }))).toContain("Only suit fives can be red.");
 
@@ -89,6 +90,15 @@ describe("scoring adapter", () => {
     expect(validateWinEntry(duplicateRed)).toContain("A suit can have at most one red five.");
   });
 
+  it("validates dora and ura dora indicators", () => {
+    expect(validateWinEntry({ ...baseWinEntry, doraIndicators: [{ suit: "honor", value: 9 }] })).toContain(
+      "Honor tiles must have value 1-7."
+    );
+    expect(validateWinEntry({ ...baseWinEntry, uraDoraIndicators: [{ suit: "north", value: 1 } as unknown as Tile] })).toContain(
+      "Tile suit must be man, pin, sou, or honor."
+    );
+  });
+
   it("rejects malformed melds", () => {
     expect(validateWinEntry(withMeld({ type: "pon", tiles: repeatTile({ suit: "man", value: 2 }, 2) }))).toContain(
       "Pon melds must contain exactly 3 tiles."
@@ -98,6 +108,9 @@ describe("scoring adapter", () => {
     );
     expect(validateWinEntry(withMeld({ type: "chi", tiles: repeatTile({ suit: "honor", value: 1 }, 3) }))).toContain(
       "Chi melds must use suited tiles."
+    );
+    expect(validateWinEntry(withMeld({ type: "pair", tiles: repeatTile({ suit: "pin", value: 2 }, 2) } as unknown as Meld))).toContain(
+      "Meld type is invalid."
     );
   });
 
