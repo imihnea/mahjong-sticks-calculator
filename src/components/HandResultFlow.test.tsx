@@ -30,8 +30,8 @@ describe("HandResultFlow", () => {
 
     const winningTileRegion = screen.getByRole("group", { name: "Winning tile" });
     const selectedTiles = within(winningTileRegion).getByLabelText("Winning tile selected tiles");
-    expect(within(selectedTiles).queryByText("1m")).not.toBeInTheDocument();
-    expect(within(selectedTiles).getByText("2p")).toBeInTheDocument();
+    expect(within(selectedTiles).queryByRole("img", { name: "1m tile" })).not.toBeInTheDocument();
+    expect(within(selectedTiles).getByRole("img", { name: "2p tile" })).toBeInTheDocument();
   });
 
   it("uses selected winner, discarder, and ron type when applying a win", async () => {
