@@ -1,6 +1,9 @@
 "use client";
 
-import type { AbortiveDrawType, GameState } from "@/domain/types";
+import { useState } from "react";
+import { validateWinEntry } from "@/domain/scoring";
+import type { AbortiveDrawType, GameState, Tile, WinEntry } from "@/domain/types";
+import { TileEditor } from "./TileEditor";
 
 interface HandResultFlowProps {
   game: GameState;
@@ -17,6 +20,9 @@ export function HandResultFlow({
   onApplyExhaustiveDraw,
   onApplyAbortiveDraw
 }: HandResultFlowProps) {
+  const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
+  const [winningTile, setWinningTile] = useState<Tile | null>(null);
+
   if (mode === "draw") {
     return (
       <section className="modal-surface">
@@ -45,11 +51,55 @@ export function HandResultFlow({
     );
   }
 
+  const winErrors = getWinEntryErrors(game, concealedTiles, winningTile);
+
   return (
     <section className="modal-surface">
       <h2>Winning hand</h2>
-      <p>The tile editor is added in the next task.</p>
-      <button onClick={onClose}>Close</button>
+      <div className="tile-editor-field">
+        <h3>Concealed tiles</h3>
+        <TileEditor tiles={concealedTiles} onChange={setConcealedTiles} />
+      </div>
+      <div className="tile-editor-field">
+        <h3>Winning tile</h3>
+        <TileEditor tiles={winningTile ? [winningTile] : []} onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)} />
+      </div>
+      {winErrors.map((error) => (
+        <p className="field-error" key={error}>
+          {error}
+        </p>
+      ))}
+      <button disabled={winErrors.length > 0} onClick={onClose}>
+        Apply
+      </button>
+      <button onClick={onClose}>Cancel</button>
     </section>
   );
+}
+
+function getWinEntryErrors(game: GameState, concealedTiles: Tile[], winningTile: Tile | null): string[] {
+  if (!winningTile) {
+    return ["Choose a winning tile."];
+  }
+
+  const winnerId = game.players[0]?.id;
+  const discarderId = game.players[1]?.id;
+
+  if (!winnerId || !discarderId) {
+    return ["A winning hand needs at least two players in the game."];
+  }
+
+  const provisionalEntry: WinEntry = {
+    winnerId,
+    winType: "ron",
+    discarderId,
+    winningTile,
+    concealedTiles,
+    melds: [],
+    doraIndicators: [],
+    uraDoraIndicators: [],
+    conditions: []
+  };
+
+  return validateWinEntry(provisionalEntry);
 }

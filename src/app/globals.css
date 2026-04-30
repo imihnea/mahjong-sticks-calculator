@@ -174,10 +174,16 @@ h1 {
 }
 
 .modal-surface h2,
+.modal-surface h3,
 .result-panel h2,
 .result-panel h3,
 .result-panel p {
   margin: 0;
+}
+
+.modal-surface h3 {
+  font-size: 0.95rem;
+  line-height: 1.2;
 }
 
 .modal-surface label {
@@ -214,6 +220,49 @@ h1 {
 .modal-surface button:hover:not(:disabled),
 .result-panel button:hover:not(:disabled) {
   background: var(--felt);
+}
+
+.tile-editor,
+.tile-editor-field {
+  display: grid;
+  gap: 8px;
+}
+
+.selected-tiles,
+.tile-keyboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.selected-tiles {
+  min-height: 36px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.tile {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tile-keyboard button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 7px 9px;
+  font-size: 0.86rem;
 }
 
 .result-panel article {
