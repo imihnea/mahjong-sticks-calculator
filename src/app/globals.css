@@ -30,6 +30,27 @@ select {
   font: inherit;
 }
 
+button {
+  min-height: 44px;
+  border: 1px solid rgba(247, 241, 223, 0.26);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #fff8e7;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .app-frame {
   min-height: 100svh;
   display: grid;
@@ -40,10 +61,17 @@ select {
     var(--felt);
 }
 
-.empty-state {
+.empty-state,
+.new-game {
   width: min(100%, 560px);
   color: var(--paper);
   text-align: center;
+}
+
+.new-game {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
 }
 
 .eyebrow {
@@ -59,4 +87,195 @@ h1 {
   font-size: clamp(2rem, 8vw, 4rem);
   line-height: 1;
   letter-spacing: 0;
+}
+
+.table-view {
+  width: min(100%, 980px);
+  display: grid;
+  gap: 16px;
+  color: var(--paper);
+}
+
+.table-center {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+  padding: 22px;
+  border: 1px solid rgba(247, 241, 223, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 57, 46, 0.6);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.16);
+}
+
+.table-center .eyebrow {
+  margin: 0;
+}
+
+.table-center h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.table-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.table-meta span,
+.dealer-badge,
+.riichi-badge {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.table-meta span {
+  border: 1px solid rgba(247, 241, 223, 0.24);
+  color: rgba(247, 241, 223, 0.86);
+}
+
+.dice-instruction {
+  max-width: 58ch;
+  margin: 0;
+  color: rgba(247, 241, 223, 0.86);
+  line-height: 1.45;
+}
+
+.action-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.action-row button {
+  flex: 0 1 auto;
+  min-width: 126px;
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas: "east south west north";
+  gap: 12px;
+}
+
+.player-seat {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid rgba(247, 241, 223, 0.26);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.player-seat-east {
+  grid-area: east;
+}
+
+.player-seat-south {
+  grid-area: south;
+}
+
+.player-seat-west {
+  grid-area: west;
+}
+
+.player-seat-north {
+  grid-area: north;
+}
+
+.player-seat h2,
+.player-seat p {
+  margin: 0;
+}
+
+.player-seat h2 {
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.player-seat p {
+  color: rgba(23, 33, 31, 0.72);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.player-seat strong {
+  overflow-wrap: anywhere;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.dealer-badge {
+  width: fit-content;
+  background: var(--accent);
+  color: white;
+}
+
+.riichi-badge {
+  width: fit-content;
+  background: var(--felt-dark);
+  color: var(--paper);
+}
+
+.player-seat button {
+  width: 100%;
+  border-color: var(--line);
+  background: var(--felt-dark);
+  color: var(--paper);
+}
+
+.player-seat button:hover:not(:disabled) {
+  background: var(--felt);
+}
+
+@media (max-width: 760px) {
+  .app-frame {
+    place-items: start center;
+  }
+
+  .table-view {
+    gap: 12px;
+  }
+
+  .players-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "east south"
+      "west north";
+  }
+}
+
+@media (max-width: 460px) {
+  .app-frame {
+    padding: 10px;
+  }
+
+  .table-center,
+  .player-seat {
+    padding: 12px;
+  }
+
+  .players-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "east"
+      "south"
+      "west"
+      "north";
+  }
+
+  .action-row button {
+    flex: 1 1 100%;
+  }
 }
