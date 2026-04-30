@@ -22,6 +22,7 @@ export function HandResultFlow({
 }: HandResultFlowProps) {
   const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
   const [winningTile, setWinningTile] = useState<Tile | null>(null);
+  const [photoReference, setPhotoReference] = useState<File | null>(null);
 
   if (mode === "draw") {
     return (
@@ -66,6 +67,16 @@ export function HandResultFlow({
           onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)}
         />
       </div>
+      <label>
+        Photo reference
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(event) => setPhotoReference(event.target.files?.[0] ?? null)}
+        />
+      </label>
+      {photoReference ? <p>{photoReference.name}</p> : null}
       {winErrors.map((error) => (
         <p className="field-error" key={error}>
           {error}
