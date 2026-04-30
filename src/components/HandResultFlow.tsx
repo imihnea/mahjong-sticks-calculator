@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { applyHonba, nearestWinnerForRiichiDeposit } from "@/domain/payments";
 import { scoreWinEntry, validateWinEntry } from "@/domain/scoring";
-import type { AbortiveDrawType, GameState, Tile, WinEntry } from "@/domain/types";
+import type { AbortiveDrawType, GameState, PlayerId, Tile, WinEntry, WinType } from "@/domain/types";
 import { ResultPanel } from "./ResultPanel";
 import { TileEditor } from "./TileEditor";
 
@@ -19,7 +19,7 @@ interface HandResultFlowProps {
   onClose: () => void;
   onApplyExhaustiveDraw: (tenpaiPlayerIds: string[]) => void;
   onApplyAbortiveDraw: (drawType: AbortiveDrawType) => void;
-  onApplyWin?: (payments: WinPayment[]) => GameState;
+  onApplyWin?: (payments: WinPayment[], entries: WinEntry[]) => GameState;
 }
 
 export function HandResultFlow({
@@ -33,6 +33,10 @@ export function HandResultFlow({
   const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
   const [winningTile, setWinningTile] = useState<Tile | null>(null);
   const [photoReference, setPhotoReference] = useState<File | null>(null);
+  const [winnerId, setWinnerId] = useState<PlayerId>(game.players[0]?.id ?? "");
+  const [winType, setWinType] = useState<WinType>("ron");
+  const [discarderId, setDiscarderId] = useState<PlayerId>(game.players[1]?.id ?? "");
+  const [tenpaiPlayerIds, setTenpaiPlayerIds] = useState<PlayerId[]>([]);
   const [result, setResult] = useState<{
     transfers: Array<{ from: string; to: string; amount: number }>;
     inventories: Array<{ playerName: string; score: number }>;
@@ -44,12 +48,23 @@ export function HandResultFlow({
     return (
       <section className="modal-surface">
         <h2>Exhaustive draw</h2>
-        {game.players.map((player) => (
-          <button key={player.id} onClick={() => onApplyExhaustiveDraw([player.id])}>
-            {player.name} tenpai only
-          </button>
-        ))}
-        <button onClick={() => onApplyExhaustiveDraw([])}>Nobody tenpai</button>
+        <div className="choice-grid">
+          {game.players.map((player) => (
+            <label key={player.id}>
+              <input
+                type="checkbox"
+                checked={tenpaiPlayerIds.includes(player.id)}
+                onChange={(event) => {
+                  setTenpaiPlayerIds((current) =>
+                    event.target.checked ? [...current, player.id] : current.filter((id) => id !== player.id)
+                  );
+                }}
+              />
+              {player.name} tenpai
+            </label>
+          ))}
+        </div>
+        <button onClick={() => onApplyExhaustiveDraw(tenpaiPlayerIds)}>Apply draw</button>
         <button onClick={onClose}>Cancel</button>
       </section>
     );
@@ -72,11 +87,60 @@ export function HandResultFlow({
     return <ResultPanel transfers={result.transfers} inventories={result.inventories} onClose={onClose} />;
   }
 
-  const winErrors = getWinEntryErrors(game, concealedTiles, winningTile);
+  const winErrors = getWinEntryErrors(game, {
+    concealedTiles,
+    winningTile,
+    winnerId,
+    winType,
+    discarderId
+  });
 
   return (
     <section className="modal-surface">
       <h2>Winning hand</h2>
+      <div className="tile-editor-field" role="group" aria-label="Winner">
+        <h3>Winner</h3>
+        <div className="choice-grid">
+          {game.players.map((player) => (
+            <button
+              aria-pressed={winnerId === player.id}
+              key={player.id}
+              onClick={() => {
+                setWinnerId(player.id);
+                if (discarderId === player.id) {
+                  setDiscarderId(game.players.find((candidate) => candidate.id !== player.id)?.id ?? "");
+                }
+              }}
+            >
+              {player.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="tile-editor-field" role="group" aria-label="Win type">
+        <h3>Win type</h3>
+        <div className="choice-grid">
+          {(["ron", "tsumo"] as const).map((type) => (
+            <button aria-pressed={winType === type} key={type} onClick={() => setWinType(type)}>
+              {type === "ron" ? "Ron" : "Tsumo"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {winType === "ron" ? (
+        <div className="tile-editor-field" role="group" aria-label="Discarder">
+          <h3>Discarder</h3>
+          <div className="choice-grid">
+            {game.players
+              .filter((player) => player.id !== winnerId)
+              .map((player) => (
+                <button aria-pressed={discarderId === player.id} key={player.id} onClick={() => setDiscarderId(player.id)}>
+                  {player.name}
+                </button>
+              ))}
+          </div>
+        </div>
+      ) : null}
       <div className="tile-editor-field">
         <TileEditor label="Concealed tiles" tiles={concealedTiles} onChange={setConcealedTiles} />
       </div>
@@ -88,7 +152,7 @@ export function HandResultFlow({
         />
       </div>
       <label>
-        Photo reference
+        Photo reference (not saved)
         <input
           type="file"
           accept="image/*"
@@ -110,6 +174,9 @@ export function HandResultFlow({
             game,
             concealedTiles,
             winningTile,
+            winnerId,
+            winType,
+            discarderId,
             onApplyWin,
             setApplyError,
             setIsApplying,
@@ -128,7 +195,10 @@ async function applyScoredWin(input: {
   game: GameState;
   concealedTiles: Tile[];
   winningTile: Tile | null;
-  onApplyWin?: (payments: WinPayment[]) => GameState;
+  winnerId: PlayerId;
+  winType: WinType;
+  discarderId: PlayerId;
+  onApplyWin?: (payments: WinPayment[], entries: WinEntry[]) => GameState;
   setApplyError: (error: string | null) => void;
   setIsApplying: (isApplying: boolean) => void;
   setResult: (result: {
@@ -136,7 +206,13 @@ async function applyScoredWin(input: {
     inventories: Array<{ playerName: string; score: number }>;
   }) => void;
 }) {
-  const entry = createProvisionalWinEntry(input.game, input.concealedTiles, input.winningTile);
+  const entry = createProvisionalWinEntry(input.game, {
+    concealedTiles: input.concealedTiles,
+    winningTile: input.winningTile,
+    winnerId: input.winnerId,
+    winType: input.winType,
+    discarderId: input.discarderId
+  });
   if (!entry) return;
 
   const winnerIndex = input.game.players.findIndex((player) => player.id === entry.winnerId);
@@ -158,7 +234,7 @@ async function applyScoredWin(input: {
       discarderIndex,
       score
     });
-    const nextGame = input.onApplyWin?.(payments) ?? previewAppliedPayments(input.game, payments);
+    const nextGame = input.onApplyWin?.(payments, [entry]) ?? previewAppliedPayments(input.game, payments);
 
     input.setResult({
       transfers: transfersFromPayments(input.game, payments),
@@ -180,11 +256,11 @@ function paymentsFromScore(input: {
   const payments: WinPayment[] = [];
 
   if (input.score.paymentKind === "ron") {
-      payments.push({
-        winnerIndex: input.winnerIndex,
-        payerIndexes: [input.discarderIndex],
-        amount: applyHonba(input.score.ronPayment, "ron", input.game.honba)
-      });
+    payments.push({
+      winnerIndex: input.winnerIndex,
+      payerIndexes: [input.discarderIndex],
+      amount: applyHonba(input.score.ronPayment, "ron", input.game.honba)
+    });
   } else {
     const payerIndexes = input.game.players.map((_, index) => index).filter((index) => index !== input.winnerIndex);
     for (const payerIndex of payerIndexes) {
@@ -230,8 +306,11 @@ function previewAppliedPayments(game: GameState, payments: WinPayment[]): GameSt
   };
 }
 
-function getWinEntryErrors(game: GameState, concealedTiles: Tile[], winningTile: Tile | null): string[] {
-  const provisionalEntry = createProvisionalWinEntry(game, concealedTiles, winningTile);
+function getWinEntryErrors(
+  game: GameState,
+  input: { concealedTiles: Tile[]; winningTile: Tile | null; winnerId: PlayerId; winType: WinType; discarderId: PlayerId }
+): string[] {
+  const provisionalEntry = createProvisionalWinEntry(game, input);
   if (!provisionalEntry) {
     return ["Choose a winning tile."];
   }
@@ -239,27 +318,30 @@ function getWinEntryErrors(game: GameState, concealedTiles: Tile[], winningTile:
   return validateWinEntry(provisionalEntry);
 }
 
-function createProvisionalWinEntry(game: GameState, concealedTiles: Tile[], winningTile: Tile | null): WinEntry | null {
-  if (!winningTile) {
+function createProvisionalWinEntry(
+  game: GameState,
+  input: { concealedTiles: Tile[]; winningTile: Tile | null; winnerId: PlayerId; winType: WinType; discarderId: PlayerId }
+): WinEntry | null {
+  if (!input.winningTile) {
     return null;
   }
 
-  const winnerId = game.players[0]?.id;
-  const discarderId = game.players[1]?.id;
+  const winnerExists = game.players.some((player) => player.id === input.winnerId);
+  const discarderExists = input.winType === "tsumo" || game.players.some((player) => player.id === input.discarderId);
 
-  if (!winnerId || !discarderId) {
+  if (!winnerExists || !discarderExists || (input.winType === "ron" && input.winnerId === input.discarderId)) {
     return null;
   }
 
-  return {
-    winnerId,
-    winType: "ron",
-    discarderId,
-    winningTile,
-    concealedTiles,
+  const base = {
+    winnerId: input.winnerId,
+    winningTile: input.winningTile,
+    concealedTiles: input.concealedTiles,
     melds: [],
     doraIndicators: [],
     uraDoraIndicators: [],
     conditions: []
   };
+
+  return input.winType === "ron" ? { ...base, winType: "ron", discarderId: input.discarderId } : { ...base, winType: "tsumo" };
 }

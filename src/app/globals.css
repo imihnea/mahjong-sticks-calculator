@@ -228,6 +228,34 @@ h1 {
   gap: 8px;
 }
 
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-grid label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: white;
+}
+
+.choice-grid input {
+  width: auto;
+  min-height: 0;
+}
+
+.choice-grid button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
 .selected-tiles,
 .tile-editor-actions,
 .tile-keyboard {

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi } from "@/domain/gameState";
+import { useEffect, useRef, useState } from "react";
+import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi, undoLastAction } from "@/domain/gameState";
 import type { AbortiveDrawType, GameLength, GameState } from "@/domain/types";
-import { loadSavedGame, saveGame } from "@/storage/gameStorage";
+import { clearSavedGame, loadSavedGame, saveGame } from "@/storage/gameStorage";
 import { DicePanel } from "./DicePanel";
 import { HandResultFlow } from "./HandResultFlow";
 import { NewGamePanel } from "./NewGamePanel";
@@ -14,6 +14,7 @@ type ActiveFlow = null | "dice" | "win" | "draw" | "abortive-draw";
 export function AppShell() {
   const [game, setGame] = useState<GameState | null | undefined>(undefined);
   const [activeFlow, setActiveFlow] = useState<ActiveFlow>(null);
+  const storageQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let isMounted = true;
@@ -31,10 +32,6 @@ export function AppShell() {
     };
   }, []);
 
-  useEffect(() => {
-    if (game) void saveGame(game).catch(() => undefined);
-  }, [game]);
-
   if (game === undefined) {
     return (
       <main className="app-frame">
@@ -50,7 +47,11 @@ export function AppShell() {
     return (
       <main className="app-frame">
         <NewGamePanel
-          onCreateGame={(input: { gameLength: GameLength; playerNames: string[] }) => setGame(createNewGame(input))}
+          onCreateGame={(input: { gameLength: GameLength; playerNames: string[] }) => {
+            const nextGame = createNewGame(input);
+            setGame(nextGame);
+            persistGame(nextGame);
+          }}
         />
       </main>
     );
@@ -59,6 +60,22 @@ export function AppShell() {
   function updateGame(nextGame: GameState) {
     setGame(nextGame);
     setActiveFlow(null);
+    persistGame(nextGame);
+  }
+
+  function startNewGame() {
+    setGame(null);
+    setActiveFlow(null);
+    enqueueStorage(clearSavedGame);
+  }
+
+  function persistGame(nextGame: GameState) {
+    enqueueStorage(() => saveGame(nextGame));
+  }
+
+  function enqueueStorage(operation: () => Promise<void>) {
+    const nextOperation = storageQueueRef.current.catch(() => undefined).then(operation);
+    storageQueueRef.current = nextOperation.catch(() => undefined);
   }
 
   return (
@@ -69,7 +86,9 @@ export function AppShell() {
         onWin={() => setActiveFlow("win")}
         onDraw={() => setActiveFlow("draw")}
         onAbortiveDraw={() => setActiveFlow("abortive-draw")}
-        onRiichi={(playerId) => setGame((current) => (current ? declareRiichi(current, playerId) : current))}
+        onUndo={() => updateGame(undoLastAction(game))}
+        onNewGame={startNewGame}
+        onRiichi={(playerId) => updateGame(declareRiichi(game, playerId))}
       />
       {activeFlow === "dice" ? (
         <DicePanel onApply={(dice) => updateGame(applyDiceRoll(game, dice))} onClose={() => setActiveFlow(null)} />
@@ -81,9 +100,10 @@ export function AppShell() {
           onClose={() => setActiveFlow(null)}
           onApplyExhaustiveDraw={(ids) => updateGame(applyExhaustiveDraw(game, ids))}
           onApplyAbortiveDraw={(drawType: AbortiveDrawType) => updateGame(applyAbortiveDraw(game, drawType))}
-          onApplyWin={(payments) => {
-            const nextGame = applyWin(game, payments);
+          onApplyWin={(payments, entries) => {
+            const nextGame = applyWin(game, payments, entries);
             setGame(nextGame);
+            persistGame(nextGame);
             return nextGame;
           }}
         />

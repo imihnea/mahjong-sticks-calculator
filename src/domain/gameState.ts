@@ -1,6 +1,6 @@
 import { MAHJONG_SOUL_RANKED_4P } from "./mahjongSoulRules";
 import { exhaustiveDrawDeltas } from "./payments";
-import type { AbortiveDrawType, GameLength, GameState, GameStateSnapshot, Player, PlayerId } from "./types";
+import type { AbortiveDrawType, GameLength, GameState, GameStateSnapshot, Player, PlayerId, WinEntry } from "./types";
 import { calculateWallBreak } from "./wallBreak";
 import { getSeatWind, rotateDealerAfterHand } from "./winds";
 
@@ -39,6 +39,7 @@ export function createNewGame(input: NewGameInput): GameState {
 }
 
 export function applyDiceRoll(game: GameState, dice: { die1: number; die2: number }): GameState {
+  assertGameActive(game);
   const currentDice = calculateWallBreak({ dealerIndex: game.dealerIndex, die1: dice.die1, die2: dice.die2 });
 
   return withSnapshot(game, {
@@ -49,6 +50,7 @@ export function applyDiceRoll(game: GameState, dice: { die1: number; die2: numbe
 }
 
 export function declareRiichi(game: GameState, playerId: PlayerId): GameState {
+  assertGameActive(game);
   const player = game.players.find((candidate) => candidate.id === playerId);
   if (!player) throw new Error("Player not found.");
   if (player.riichi) {
@@ -69,6 +71,7 @@ export function declareRiichi(game: GameState, playerId: PlayerId): GameState {
 }
 
 export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]): GameState {
+  assertGameActive(game);
   if (new Set(tenpaiPlayerIds).size !== tenpaiPlayerIds.length) {
     throw new Error("Tenpai players must be unique.");
   }
@@ -84,21 +87,25 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
   const roundProgression = advanceRound(game, dealerContinues);
   const tenpaiPlayerIdsSnapshot = [...tenpaiPlayerIds];
 
-  return withSnapshot(
-    game,
-    refreshSeats({
-      ...game,
-      ...roundProgression,
-      dealerIndex,
-      honba: game.honba + 1,
-      players: clearRiichi(applyDeltas(game.players, deltas)),
-      currentDice: undefined,
-      history: [...game.history, { type: "exhaustive-draw", tenpaiPlayerIds: tenpaiPlayerIdsSnapshot }]
-    })
-  );
+  const nextGame = refreshSeats({
+    ...game,
+    ...roundProgression,
+    dealerIndex,
+    honba: game.honba + 1,
+    players: clearRiichi(applyDeltas(game.players, deltas)),
+    currentDice: undefined,
+    history: [...game.history, { type: "exhaustive-draw", tenpaiPlayerIds: tenpaiPlayerIdsSnapshot }]
+  });
+
+  return withSnapshot(game, markEndedAfterHand(game, nextGame, dealerContinues));
 }
 
-export function applyWin(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): GameState {
+export function applyWin(
+  game: GameState,
+  payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>,
+  entries: WinEntry[] = []
+): GameState {
+  assertGameActive(game);
   validateWinPayments(game, payments);
 
   const dealerWon = payments.some((payment) => payment.payerIndexes.length > 0 && payment.winnerIndex === game.dealerIndex);
@@ -110,22 +117,22 @@ export function applyWin(game: GameState, payments: Array<{ winnerIndex: number;
     return { ...player, score: player.score + won - paid, riichi: false };
   });
 
-  return withSnapshot(
-    game,
-    refreshSeats({
-      ...game,
-      ...roundProgression,
-      players,
-      dealerIndex,
-      honba: dealerWon ? game.honba + 1 : 0,
-      riichiSticks: 0,
-      currentDice: undefined,
-      history: [...game.history, { type: "win", entries: [] }]
-    })
-  );
+  const nextGame = refreshSeats({
+    ...game,
+    ...roundProgression,
+    players,
+    dealerIndex,
+    honba: dealerWon ? game.honba + 1 : 0,
+    riichiSticks: 0,
+    currentDice: undefined,
+    history: [...game.history, { type: "win", entries }]
+  });
+
+  return withSnapshot(game, markEndedAfterHand(game, nextGame, dealerWon));
 }
 
 export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): GameState {
+  assertGameActive(game);
   return withSnapshot(game, {
     ...game,
     honba: game.honba + 1,
@@ -133,6 +140,15 @@ export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): 
     currentDice: undefined,
     history: [...game.history, { type: "abortive-draw", drawType }]
   });
+}
+
+export function undoLastAction(game: GameState): GameState {
+  const previousSnapshot = game.undoStack.at(-1);
+  if (!previousSnapshot) {
+    throw new Error("No action to undo.");
+  }
+
+  return { ...previousSnapshot, undoStack: game.undoStack.slice(0, -1) };
 }
 
 function validateWinPayments(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): void {
@@ -230,6 +246,39 @@ function advanceRound(game: GameState, dealerContinues: boolean): Pick<GameState
   return { roundWind: game.roundWind, handNumber: game.handNumber };
 }
 
+function markEndedAfterHand(previousGame: GameState, nextGame: GameState, dealerContinues: boolean): GameState {
+  if (nextGame.players.some((player) => player.score < 0)) {
+    return { ...nextGame, ended: true };
+  }
+
+  const hasPlayerAtTarget = nextGame.players.some((player) => player.score >= MAHJONG_SOUL_RANKED_4P.targetPoints);
+  const isEndableHand = isScheduledFinalHand(previousGame) || isExtensionHand(previousGame);
+  const ended =
+    isEndableHand &&
+    (dealerContinues ? isDealerFirstAtTarget(previousGame, nextGame) : hasPlayerAtTarget || isMaximumExtensionFinalHand(previousGame));
+  return { ...nextGame, ended };
+}
+
+function isScheduledFinalHand(game: GameState): boolean {
+  return (game.gameLength === "east" && game.roundWind === "east" && game.handNumber === 4) ||
+    (game.gameLength === "south" && game.roundWind === "south" && game.handNumber === 4);
+}
+
+function isExtensionHand(game: GameState): boolean {
+  return (game.gameLength === "east" && game.roundWind !== "east") || (game.gameLength === "south" && game.roundWind === "west");
+}
+
+function isMaximumExtensionFinalHand(game: GameState): boolean {
+  return (game.gameLength === "east" && game.roundWind === "south" && game.handNumber === 4) ||
+    (game.gameLength === "south" && game.roundWind === "west" && game.handNumber === 4);
+}
+
+function isDealerFirstAtTarget(previousGame: GameState, nextGame: GameState): boolean {
+  const dealerScore = nextGame.players[previousGame.dealerIndex]?.score ?? Number.NEGATIVE_INFINITY;
+  const highestScore = Math.max(...nextGame.players.map((player) => player.score));
+  return dealerScore >= MAHJONG_SOUL_RANKED_4P.targetPoints && dealerScore >= highestScore;
+}
+
 function withSnapshot(previousGame: GameState, nextGame: GameState): GameState {
   const snapshot = toSnapshot(previousGame);
   return { ...nextGame, undoStack: [...previousGame.undoStack, snapshot] };
@@ -260,6 +309,12 @@ function assertSeatIndex(index: number): void {
 function assertPayment(payment: number): void {
   if (!Number.isInteger(payment) || payment <= 0 || payment % 100 !== 0) {
     throw new Error("Payment must be a positive multiple of 100.");
+  }
+}
+
+function assertGameActive(game: GameState): void {
+  if (game.ended) {
+    throw new Error("Game has ended.");
   }
 }
 

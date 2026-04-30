@@ -9,6 +9,8 @@ interface TableViewProps {
   onWin: () => void;
   onDraw: () => void;
   onAbortiveDraw: () => void;
+  onUndo: () => void;
+  onNewGame: () => void;
   onRiichi: (playerId: string) => void;
 }
 
@@ -25,13 +27,16 @@ export function TableView(props: TableViewProps) {
         <div className="table-meta">
           <span>{game.honba} honba</span>
           <span>{game.riichiSticks} riichi sticks</span>
+          {game.ended ? <span>Game ended</span> : null}
         </div>
         {game.currentDice ? <p className="dice-instruction">{game.currentDice.instruction}</p> : null}
         <div className="action-row">
-          <button onClick={props.onRollDice}>Roll dice</button>
-          <button onClick={props.onWin}>Win</button>
-          <button onClick={props.onDraw}>Draw</button>
-          <button onClick={props.onAbortiveDraw}>Abortive draw</button>
+          <button onClick={props.onRollDice} disabled={game.ended}>Roll dice</button>
+          <button onClick={props.onWin} disabled={game.ended}>Win</button>
+          <button onClick={props.onDraw} disabled={game.ended}>Draw</button>
+          <button onClick={props.onAbortiveDraw} disabled={game.ended}>Abortive draw</button>
+          <button onClick={props.onUndo} disabled={game.undoStack.length === 0}>Undo</button>
+          <button onClick={props.onNewGame}>New game</button>
         </div>
       </div>
 
@@ -48,7 +53,7 @@ export function TableView(props: TableViewProps) {
             <button
               aria-label={`Declare riichi for ${player.name}`}
               onClick={() => props.onRiichi(player.id)}
-              disabled={player.riichi}
+              disabled={game.ended || player.riichi}
             >
               Riichi
             </button>

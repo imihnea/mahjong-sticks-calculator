@@ -13,6 +13,8 @@ describe("TableView", () => {
         onWin={() => undefined}
         onDraw={() => undefined}
         onAbortiveDraw={() => undefined}
+        onUndo={() => undefined}
+        onNewGame={() => undefined}
         onRiichi={() => undefined}
       />
     );
@@ -34,8 +36,30 @@ describe("TableView", () => {
       expect(within(seat as HTMLElement).getByText("25000")).toBeInTheDocument();
     });
 
-    ["Roll dice", "Win", "Draw", "Abortive draw"].forEach((name) => {
+    ["Roll dice", "Win", "Draw", "Abortive draw", "Undo", "New game"].forEach((name) => {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     });
+  });
+
+  it("disables hand actions when the game is ended", () => {
+    const game = { ...createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }), ended: true };
+    render(
+      <TableView
+        game={game}
+        onRollDice={() => undefined}
+        onWin={() => undefined}
+        onDraw={() => undefined}
+        onAbortiveDraw={() => undefined}
+        onUndo={() => undefined}
+        onNewGame={() => undefined}
+        onRiichi={() => undefined}
+      />
+    );
+
+    expect(screen.getByText("Game ended")).toBeInTheDocument();
+    ["Roll dice", "Win", "Draw", "Abortive draw"].forEach((name) => {
+      expect(screen.getByRole("button", { name })).toBeDisabled();
+    });
+    expect(screen.getByRole("button", { name: "New game" })).toBeEnabled();
   });
 });

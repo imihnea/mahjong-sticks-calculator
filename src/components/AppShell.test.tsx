@@ -4,12 +4,14 @@ import { createNewGame } from "@/domain/gameState";
 import type { GameState } from "@/domain/types";
 import { AppShell } from "./AppShell";
 
-const { loadSavedGame, saveGame } = vi.hoisted(() => ({
+const { clearSavedGame, loadSavedGame, saveGame } = vi.hoisted(() => ({
   loadSavedGame: vi.fn<() => Promise<GameState | null>>(),
-  saveGame: vi.fn<(game: GameState) => Promise<void>>()
+  saveGame: vi.fn<(game: GameState) => Promise<void>>(),
+  clearSavedGame: vi.fn<() => Promise<void>>()
 }));
 
 vi.mock("@/storage/gameStorage", () => ({
+  clearSavedGame,
   loadSavedGame,
   saveGame
 }));
@@ -18,7 +20,9 @@ describe("AppShell", () => {
   beforeEach(() => {
     loadSavedGame.mockReset();
     saveGame.mockReset();
+    clearSavedGame.mockReset();
     saveGame.mockResolvedValue(undefined);
+    clearSavedGame.mockResolvedValue(undefined);
   });
 
   it("waits for saved game loading before showing new game controls", async () => {
@@ -70,6 +74,63 @@ describe("AppShell", () => {
     });
   });
 
+  it("undoes the last action and starts a new game from the table", async () => {
+    loadSavedGame.mockResolvedValue(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }));
+    render(<AppShell />);
+    await screen.findByText("East 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Roll dice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(await screen.findByText("Break South's wall after 2 stacks from the right.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Break South's wall after 2 stacks from the right.")).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "New game" }));
+    expect(await screen.findByRole("button", { name: "Start East Game" })).toBeInTheDocument();
+    expect(clearSavedGame).toHaveBeenCalled();
+  });
+
+  it("saves a replacement game only after the previous saved game is cleared", async () => {
+    let resolveClear!: () => void;
+    let clearResolved = false;
+    const savedGame = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const savesBeforeClear: GameState[] = [];
+    loadSavedGame.mockResolvedValue(savedGame);
+    clearSavedGame.mockReturnValue(
+      new Promise((resolve) => {
+        resolveClear = () => {
+          clearResolved = true;
+          resolve();
+        };
+      })
+    );
+    saveGame.mockImplementation(async (game) => {
+      if (!clearResolved) savesBeforeClear.push(game);
+    });
+
+    render(<AppShell />);
+    await screen.findByText("East 1");
+    saveGame.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "New game" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start East Game" }));
+    expect(await screen.findByText("East 1")).toBeInTheDocument();
+    await act(async () => undefined);
+
+    expect(savesBeforeClear).toEqual([]);
+
+    await act(async () => {
+      resolveClear();
+    });
+
+    await waitFor(() => {
+      expect(saveGame).toHaveBeenCalledWith(expect.objectContaining({ id: expect.not.stringMatching(savedGame.id) }));
+    });
+  });
+
   it("applies an exhaustive draw, closes the flow, and saves the updated game", async () => {
     loadSavedGame.mockResolvedValue(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }));
     render(<AppShell />);
@@ -77,7 +138,8 @@ describe("AppShell", () => {
     saveGame.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "Draw" }));
-    fireEvent.click(screen.getByRole("button", { name: "B tenpai only" }));
+    fireEvent.click(screen.getByLabelText("B tenpai"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply draw" }));
 
     expect(await screen.findByText("East 2")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Exhaustive draw" })).not.toBeInTheDocument();

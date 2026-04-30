@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi } from "./gameState";
+import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi, undoLastAction } from "./gameState";
 
 describe("gameState", () => {
   it("creates a Mahjong Soul East game with winds and dealer marker", () => {
@@ -23,6 +23,18 @@ describe("gameState", () => {
     expect(next.history.at(-1)?.type).toBe("dice");
     expect(next.undoStack.at(-1)?.currentDice).toBeUndefined();
     expect(next.undoStack.at(-1)?.history).toEqual([]);
+  });
+
+  it("undoes the last state transition", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const next = applyDiceRoll(game, { die1: 2, die2: 4 });
+
+    const undone = undoLastAction(next);
+
+    expect(undone.currentDice).toBeUndefined();
+    expect(undone.history).toEqual([]);
+    expect(undone.undoStack).toEqual([]);
+    expect(() => undoLastAction(game)).toThrow("No action to undo.");
   });
 
   it("prevents riichi below 1000 and otherwise deposits a stick", () => {
@@ -152,6 +164,93 @@ describe("gameState", () => {
     expect(next.roundWind).toBe("east");
     expect(next.players[1].seatWind).toBe("east");
     expect(next.currentDice).toBeUndefined();
+  });
+
+  it("ends on tobi and at target after the scheduled final hand", () => {
+    const eastGame = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const tobiGame = {
+      ...eastGame,
+      players: eastGame.players.map((player, index) => (index === 0 ? { ...player, score: 1000 } : player))
+    };
+    expect(applyWin(tobiGame, [{ winnerIndex: 1, payerIndexes: [0], amount: 2000 }]).ended).toBe(true);
+
+    const east2 = applyWin(eastGame, [{ winnerIndex: 1, payerIndexes: [0], amount: 8000 }]);
+    const east3 = applyWin(east2, [{ winnerIndex: 2, payerIndexes: [1], amount: 8000 }]);
+    const east4 = applyWin(east3, [{ winnerIndex: 3, payerIndexes: [2], amount: 8000 }]);
+
+    const ended = applyWin(east4, [{ winnerIndex: 1, payerIndexes: [3], amount: 8000 }]);
+
+    expect(ended.ended).toBe(true);
+    expect(ended.roundWind).toBe("south");
+    expect(ended.handNumber).toBe(1);
+  });
+
+  it("extends past the scheduled final hand when nobody reaches target", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const lowScoreGame = {
+      ...game,
+      handNumber: 4,
+      players: game.players.map((player) => ({ ...player, score: 25000 }))
+    };
+
+    const next = applyWin(lowScoreGame, [{ winnerIndex: 1, payerIndexes: [0], amount: 1000 }]);
+
+    expect(next.ended).toBe(false);
+    expect(next.roundWind).toBe("south");
+    expect(next.handNumber).toBe(1);
+  });
+
+  it("ends the scheduled final hand when the dealer continues and target is reached", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const east4 = {
+      ...game,
+      handNumber: 4,
+      players: game.players.map((player, index) => (index === 0 ? { ...player, score: 29000 } : player))
+    };
+
+    const dealerWin = applyWin(east4, [{ winnerIndex: 0, payerIndexes: [1], amount: 1000 }]);
+
+    expect(dealerWin.ended).toBe(true);
+
+    const dealerTenpai = applyExhaustiveDraw(east4, [east4.players[0].id]);
+
+    expect(dealerTenpai.ended).toBe(true);
+  });
+
+  it("continues all-last dealer repeats until the dealer is first at target", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const east4 = {
+      ...game,
+      handNumber: 4,
+      players: game.players.map((player, index) => {
+        if (index === 0) return { ...player, score: 26000 };
+        if (index === 1) return { ...player, score: 32000 };
+        return { ...player, score: 21000 };
+      })
+    };
+    const south1 = { ...east4, roundWind: "south" as const, handNumber: 1 };
+
+    const dealerWinBehind = applyWin(east4, [{ winnerIndex: 0, payerIndexes: [2], amount: 1000 }]);
+    const extensionDealerTenpaiBehind = applyExhaustiveDraw(south1, [south1.players[0].id]);
+
+    expect(dealerWinBehind.ended).toBe(false);
+    expect(dealerWinBehind.handNumber).toBe(4);
+    expect(extensionDealerTenpaiBehind.ended).toBe(false);
+    expect(extensionDealerTenpaiBehind.roundWind).toBe("south");
+  });
+
+  it("ends after the maximum extension round when nobody reaches target", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const south4 = {
+      ...game,
+      roundWind: "south" as const,
+      handNumber: 4,
+      players: game.players.map((player) => ({ ...player, score: 25000 }))
+    };
+
+    const next = applyWin(south4, [{ winnerIndex: 1, payerIndexes: [0], amount: 1000 }]);
+
+    expect(next.ended).toBe(true);
   });
 
   it("advances round wind after a non-dealer win on the fourth hand", () => {

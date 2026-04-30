@@ -12,3 +12,4 @@ Local-first Riichi Mahjong table tracker for a four-player group using Mahjong S
 ## Notes
 
 Camera capture requires HTTPS or localhost. Vercel production deploys provide HTTPS.
+The current workflow uses manual tile entry with an optional one-session photo reference; it does not persist or OCR the photo yet.
