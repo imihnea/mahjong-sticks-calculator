@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function supportsCameraCapture(
   navigatorLike: Pick<Navigator, "mediaDevices"> | { mediaDevices?: undefined }
@@ -16,10 +16,20 @@ export function cameraUnavailableMessage(isSecureContext: boolean): string {
 
 export function useCameraCapture() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const stopCurrentStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
   const start = useCallback(async () => {
+    setError(null);
+
     if (!supportsCameraCapture(navigator)) {
       setError(cameraUnavailableMessage(window.isSecureContext));
       return;
@@ -30,17 +40,21 @@ export function useCameraCapture() {
         video: { facingMode: "environment" },
         audio: false
       });
+      stopCurrentStream();
+      streamRef.current = nextStream;
       setStream(nextStream);
       if (videoRef.current) videoRef.current.srcObject = nextStream;
     } catch {
       setError(cameraUnavailableMessage(window.isSecureContext));
     }
-  }, []);
+  }, [stopCurrentStream]);
 
   const stop = useCallback(() => {
-    stream?.getTracks().forEach((track) => track.stop());
-    setStream(null);
-  }, [stream]);
+    stopCurrentStream();
+    setError(null);
+  }, [stopCurrentStream]);
+
+  useEffect(() => stopCurrentStream, [stopCurrentStream]);
 
   return { videoRef, stream, error, start, stop };
 }
