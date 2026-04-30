@@ -5,7 +5,7 @@ describe("payments", () => {
   it("applies ron deltas from one discarder to one winner", () => {
     expect(ronDeltas({ winnerIndex: 1, discarderIndex: 3, basePayment: 8000, honba: 0, riichiSticks: 1 })).toEqual([
       { playerIndex: 1, delta: 9000 },
-      { playerIndex: 3, delta: -9000 }
+      { playerIndex: 3, delta: -8000 }
     ]);
   });
 
@@ -39,5 +39,38 @@ describe("payments", () => {
       { playerIndex: 2, delta: 1000 },
       { playerIndex: 3, delta: -3000 }
     ]);
+  });
+
+  it("rejects impossible ron payment inputs", () => {
+    expect(() => ronDeltas({ winnerIndex: 1, discarderIndex: 1, basePayment: 8000, honba: 0, riichiSticks: 0 })).toThrow(
+      "Winner and discarder must be different players."
+    );
+    expect(() => ronDeltas({ winnerIndex: 4, discarderIndex: 1, basePayment: 8000, honba: 0, riichiSticks: 0 })).toThrow(
+      "Player index must be between 0 and 3."
+    );
+    expect(() => ronDeltas({ winnerIndex: 1, discarderIndex: 3, basePayment: 8050, honba: 0, riichiSticks: 0 })).toThrow(
+      "Payment must be a positive multiple of 100."
+    );
+    expect(() => ronDeltas({ winnerIndex: 1, discarderIndex: 3, basePayment: 8000, honba: -1, riichiSticks: 0 })).toThrow(
+      "Honba must be a non-negative integer."
+    );
+    expect(() => ronDeltas({ winnerIndex: 1, discarderIndex: 3, basePayment: 8000, honba: 0, riichiSticks: -1 })).toThrow(
+      "Riichi sticks must be a non-negative integer."
+    );
+  });
+
+  it("rejects impossible tsumo payment inputs", () => {
+    expect(() => tsumoDeltas({ winnerIndex: 0, dealerIndex: 0, dealerPays: 4000, childPays: 2000, honba: 0, riichiSticks: 0 })).toThrow(
+      "Dealer payment is not used when the winner is dealer."
+    );
+    expect(() => tsumoDeltas({ winnerIndex: 2, dealerIndex: 0, dealerPays: 4050, childPays: 2000, honba: 0, riichiSticks: 0 })).toThrow(
+      "Payment must be a positive multiple of 100."
+    );
+  });
+
+  it("rejects invalid exhaustive draw inputs", () => {
+    expect(() => exhaustiveDrawDeltas([0, 1, 2, 2], 4)).toThrow("Tenpai player indexes must be unique.");
+    expect(() => exhaustiveDrawDeltas([-1], 4)).toThrow("Player index must be between 0 and 3.");
+    expect(() => exhaustiveDrawDeltas([0], 3)).toThrow("Only four-player exhaustive draw payments are supported.");
   });
 });
