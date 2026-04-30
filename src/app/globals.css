@@ -363,7 +363,15 @@ h1 {
   display: block;
   width: 42px;
   height: 58px;
+  box-sizing: border-box;
+  border: 1px solid rgba(73, 87, 79, 0.26);
+  border-radius: 6px;
+  background: linear-gradient(145deg, #fffdf6 0%, #f0efe7 72%, #d5d8cf 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 3px rgba(33, 45, 39, 0.18);
   object-fit: contain;
+  padding: 3px;
 }
 
 .selected-tiles .tile-face {
