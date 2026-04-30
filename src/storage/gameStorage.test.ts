@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createNewGame } from "@/domain/gameState";
+import { applyDiceRoll, createNewGame, declareRiichi } from "@/domain/gameState";
 import { clearSavedGame, loadSavedGame, saveGame } from "./gameStorage";
 
 const { stores } = vi.hoisted(() => ({
@@ -27,9 +27,12 @@ vi.mock("idb", () => ({
         }
       },
       put: async (storeName: string, value: unknown, key: string) => {
-        stores.get(storeName)?.set(key, value);
+        stores.get(storeName)?.set(key, structuredClone(value));
       },
-      get: async (storeName: string, key: string) => stores.get(storeName)?.get(key),
+      get: async (storeName: string, key: string) => {
+        const value = stores.get(storeName)?.get(key);
+        return value ? structuredClone(value) : value;
+      },
       delete: async (storeName: string, key: string) => {
         stores.get(storeName)?.delete(key);
       }
@@ -47,9 +50,13 @@ describe("gameStorage", () => {
   });
 
   it("saves and loads the active game", async () => {
-    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const newGame = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const gameWithDice = applyDiceRoll(newGame, { die1: 2, die2: 5 });
+    const game = declareRiichi(gameWithDice, gameWithDice.players[0].id);
+
     await saveGame(game);
-    await expect(loadSavedGame()).resolves.toMatchObject({ id: game.id, gameLength: "east" });
+
+    await expect(loadSavedGame()).resolves.toEqual(game);
   });
 
   it("returns null when no game is saved", async () => {

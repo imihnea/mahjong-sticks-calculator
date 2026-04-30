@@ -1,4 +1,4 @@
-import { openDB } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { GameState } from "@/domain/types";
 
 const DB_NAME = "mahjong-sticks-calculator";
@@ -6,7 +6,14 @@ const DB_VERSION = 1;
 const STORE_NAME = "games";
 const ACTIVE_GAME_KEY = "active";
 
-async function getDb() {
+interface MahjongSticksDb extends DBSchema {
+  games: {
+    key: string;
+    value: GameState;
+  };
+}
+
+async function getDb(): Promise<IDBPDatabase<MahjongSticksDb>> {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
