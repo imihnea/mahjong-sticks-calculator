@@ -101,6 +101,7 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
 export function applyWin(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): GameState {
   const dealerWon = payments.some((payment) => payment.winnerIndex === game.dealerIndex);
   const dealerIndex = rotateDealerAfterHand(game.dealerIndex, dealerWon);
+  const roundProgression = advanceRound(game, dealerWon);
   const players = game.players.map((player, index) => {
     const won = payments.filter((payment) => payment.winnerIndex === index).reduce((sum, payment) => sum + payment.amount, 0);
     const paid = payments.filter((payment) => payment.payerIndexes.includes(index)).reduce((sum, payment) => sum + payment.amount, 0);
@@ -111,6 +112,7 @@ export function applyWin(game: GameState, payments: Array<{ winnerIndex: number;
     game,
     refreshSeats({
       ...game,
+      ...roundProgression,
       players,
       dealerIndex,
       honba: dealerWon ? game.honba + 1 : 0,

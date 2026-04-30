@@ -98,6 +98,31 @@ describe("gameState", () => {
     expect(next.honba).toBe(0);
   });
 
+  it("rotates dealer and advances the hand after a non-dealer win", () => {
+    const game = applyDiceRoll(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }), { die1: 1, die2: 2 });
+
+    const next = applyWin(game, [{ winnerIndex: 2, payerIndexes: [0], amount: 8000 }]);
+
+    expect(next.dealerIndex).toBe(1);
+    expect(next.handNumber).toBe(2);
+    expect(next.roundWind).toBe("east");
+    expect(next.players[1].seatWind).toBe("east");
+    expect(next.currentDice).toBeUndefined();
+  });
+
+  it("advances round wind after a non-dealer win on the fourth hand", () => {
+    const game = createNewGame({ gameLength: "south", playerNames: ["A", "B", "C", "D"] });
+    const east2 = applyWin(game, [{ winnerIndex: 1, payerIndexes: [0], amount: 8000 }]);
+    const east3 = applyWin(east2, [{ winnerIndex: 2, payerIndexes: [1], amount: 8000 }]);
+    const east4 = applyWin(east3, [{ winnerIndex: 3, payerIndexes: [2], amount: 8000 }]);
+
+    const south1 = applyWin(east4, [{ winnerIndex: 1, payerIndexes: [3], amount: 8000 }]);
+
+    expect(south1.roundWind).toBe("south");
+    expect(south1.handNumber).toBe(1);
+    expect(south1.dealerIndex).toBe(0);
+  });
+
   it("advances round wind after four dealer rotations", () => {
     const game = createNewGame({ gameLength: "south", playerNames: ["A", "B", "C", "D"] });
     const east2 = applyExhaustiveDraw(game, [game.players[1].id]);
