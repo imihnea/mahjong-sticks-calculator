@@ -91,7 +91,7 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
       ...roundProgression,
       dealerIndex,
       honba: game.honba + 1,
-      players: applyDeltas(game.players, deltas),
+      players: clearRiichi(applyDeltas(game.players, deltas)),
       currentDice: undefined,
       history: [...game.history, { type: "exhaustive-draw", tenpaiPlayerIds: tenpaiPlayerIdsSnapshot }]
     })
@@ -102,6 +102,7 @@ export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): 
   return withSnapshot(game, {
     ...game,
     honba: game.honba + 1,
+    players: clearRiichi(game.players),
     currentDice: undefined,
     history: [...game.history, { type: "abortive-draw", drawType }]
   });
@@ -112,6 +113,10 @@ function applyDeltas(players: Player[], deltas: Array<{ playerIndex: number; del
     const delta = deltas.find((candidate) => candidate.playerIndex === index)?.delta ?? 0;
     return { ...player, score: player.score + delta };
   });
+}
+
+function clearRiichi(players: Player[]): Player[] {
+  return players.map((player) => ({ ...player, riichi: false }));
 }
 
 function refreshSeats(game: GameState): GameState {

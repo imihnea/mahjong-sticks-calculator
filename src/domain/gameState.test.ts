@@ -80,6 +80,16 @@ describe("gameState", () => {
     expect(next.players[0].seatWind).toBe("east");
   });
 
+  it("clears active riichi state after exhaustive draw while keeping riichi sticks", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const afterRiichi = declareRiichi(game, game.players[2].id);
+
+    const next = applyExhaustiveDraw(afterRiichi, [afterRiichi.players[1].id]);
+
+    expect(next.riichiSticks).toBe(1);
+    expect(next.players.every((player) => !player.riichi)).toBe(true);
+  });
+
   it("advances round wind after four dealer rotations", () => {
     const game = createNewGame({ gameLength: "south", playerNames: ["A", "B", "C", "D"] });
     const east2 = applyExhaustiveDraw(game, [game.players[1].id]);
@@ -107,5 +117,15 @@ describe("gameState", () => {
     expect(next.honba).toBe(1);
     expect(next.currentDice).toBeUndefined();
     expect(next.history.at(-1)).toEqual({ type: "abortive-draw", drawType: "suufuu-renda" });
+  });
+
+  it("clears active riichi state after abortive draw while keeping riichi sticks", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const afterRiichi = declareRiichi(game, game.players[3].id);
+
+    const next = applyAbortiveDraw(afterRiichi, "suucha-riichi");
+
+    expect(next.riichiSticks).toBe(1);
+    expect(next.players.every((player) => !player.riichi)).toBe(true);
   });
 });
