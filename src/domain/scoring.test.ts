@@ -50,6 +50,12 @@ describe("scoring adapter", () => {
     });
   });
 
+  it("rejects invalid manual score win types", () => {
+    expect(() => scoreManualLimitHand({ label: "mangan", dealer: false, winType: "draw" as "ron" })).toThrow(
+      "Win type must be ron or tsumo."
+    );
+  });
+
   it("accepts kan hands as 14 effective tiles", () => {
     const kanEntry: WinEntry = {
       ...baseWinEntry,
@@ -141,6 +147,7 @@ describe("scoring adapter", () => {
 
     const tsumoWithDiscarder = { ...baseWinEntry, winType: "tsumo" } as unknown as WinEntry;
     expect(validateWinEntry(tsumoWithDiscarder)).toContain("Tsumo must not include a discarder.");
+    await expect(scoreWinEntry(tsumoWithDiscarder)).rejects.toThrow("Tsumo must not include a discarder.");
   });
 });
 

@@ -79,17 +79,23 @@ export function scoreManualLimitHand(input: {
   dealer: boolean;
   winType: WinType;
 }): ScoreBreakdown {
-  return input.winType === "ron"
-    ? { yaku: ["Manual mangan"], han: 5, fu: 0, limit: input.label, paymentKind: "ron", ronPayment: input.dealer ? 12000 : 8000 }
-    : {
-        yaku: ["Manual mangan"],
-        han: 5,
-        fu: 0,
-        limit: input.label,
-        paymentKind: "tsumo",
-        dealerTsumoPayment: input.dealer ? 4000 : 4000,
-        childTsumoPayment: input.dealer ? 4000 : 2000
-      };
+  if (input.winType === "ron") {
+    return { yaku: ["Manual mangan"], han: 5, fu: 0, limit: input.label, paymentKind: "ron", ronPayment: input.dealer ? 12000 : 8000 };
+  }
+
+  if (input.winType === "tsumo") {
+    return {
+      yaku: ["Manual mangan"],
+      han: 5,
+      fu: 0,
+      limit: input.label,
+      paymentKind: "tsumo",
+      dealerTsumoPayment: input.dealer ? 4000 : 4000,
+      childTsumoPayment: input.dealer ? 4000 : 2000
+    };
+  }
+
+  throw new Error("Win type must be ron or tsumo.");
 }
 
 // The MVP boundary validates inputs now; full yaku/fu scoring is wired in Task 11.
