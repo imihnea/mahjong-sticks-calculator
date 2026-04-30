@@ -6,26 +6,47 @@ const baseWinEntry: WinEntry = {
   winnerId: "p1",
   winType: "ron",
   discarderId: "p2",
-  winningTile: { suit: "man", value: 3 },
+  winningTile: { suit: "man", value: 2 },
   concealedTiles: [
-    { suit: "man", value: 2 },
     { suit: "man", value: 3 },
     { suit: "man", value: 4 },
-    { suit: "pin", value: 2 },
-    { suit: "pin", value: 3 },
-    { suit: "pin", value: 4 },
-    { suit: "sou", value: 2 },
-    { suit: "sou", value: 3 },
-    { suit: "sou", value: 4 },
     { suit: "man", value: 6 },
     { suit: "man", value: 7 },
     { suit: "man", value: 8 },
-    { suit: "honor", value: 1 }
+    { suit: "pin", value: 2 },
+    { suit: "pin", value: 3 },
+    { suit: "pin", value: 4 },
+    { suit: "sou", value: 3 },
+    { suit: "sou", value: 4 },
+    { suit: "sou", value: 5 },
+    { suit: "sou", value: 5 },
+    { suit: "sou", value: 5 }
   ],
   melds: [],
   doraIndicators: [],
   uraDoraIndicators: [],
   conditions: ["riichi"]
+};
+
+const noYakuRonEntry: WinEntry = {
+  ...baseWinEntry,
+  winningTile: { suit: "man", value: 2 },
+  concealedTiles: [
+    { suit: "man", value: 3 },
+    { suit: "man", value: 4 },
+    { suit: "man", value: 6 },
+    { suit: "man", value: 7 },
+    { suit: "man", value: 8 },
+    { suit: "pin", value: 2 },
+    { suit: "pin", value: 3 },
+    { suit: "pin", value: 4 },
+    { suit: "sou", value: 3 },
+    { suit: "sou", value: 4 },
+    { suit: "sou", value: 5 },
+    { suit: "honor", value: 1 },
+    { suit: "honor", value: 1 }
+  ],
+  conditions: []
 };
 
 describe("scoring adapter", () => {
@@ -120,10 +141,26 @@ describe("scoring adapter", () => {
     );
   });
 
+  it("scores manual riichi pinfu ron fixture through the adapter", async () => {
+    const result = await scoreWinEntry(baseWinEntry);
+
+    expect(result.paymentKind).toBe("ron");
+    expect(result.yaku).toContain("Riichi");
+    expect(result.yaku).toContain("Pinfu");
+    expect(result.han).toBeGreaterThanOrEqual(1);
+    if (result.paymentKind === "ron") {
+      expect(result.ronPayment).toBeGreaterThan(0);
+    }
+  });
+
+  it("requires at least one yaku", async () => {
+    await expect(scoreWinEntry(noYakuRonEntry)).rejects.toThrow("Winning hand has no yaku.");
+  });
+
   it("returns only relevant payment fields for the win type", async () => {
     await expect(scoreWinEntry(baseWinEntry)).resolves.toMatchObject({
       paymentKind: "ron",
-      ronPayment: 1000
+      ronPayment: 3900
     });
     await expect(scoreWinEntry(baseWinEntry)).resolves.not.toHaveProperty("dealerTsumoPayment");
 
@@ -134,8 +171,8 @@ describe("scoring adapter", () => {
     };
     await expect(scoreWinEntry(tsumoEntry)).resolves.toMatchObject({
       paymentKind: "tsumo",
-      dealerTsumoPayment: 500,
-      childTsumoPayment: 300
+      dealerTsumoPayment: 2600,
+      childTsumoPayment: 1300
     });
     await expect(scoreWinEntry(tsumoEntry)).resolves.not.toHaveProperty("ronPayment");
   });

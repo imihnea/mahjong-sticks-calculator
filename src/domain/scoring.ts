@@ -1,3 +1,4 @@
+import Riichi from "riichi";
 import type { Tile, WinEntry, WinType } from "./types";
 
 type LimitLabel = "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman" | "double-yakuman" | "triple-yakuman";
@@ -98,28 +99,122 @@ export function scoreManualLimitHand(input: {
   throw new Error("Win type must be ron or tsumo.");
 }
 
-// The MVP boundary validates inputs now; full yaku/fu scoring is wired in Task 11.
 export async function scoreWinEntry(entry: WinEntry): Promise<ScoreBreakdown> {
   const errors = validateWinEntry(entry);
   if (errors.length > 0) {
     throw new Error(errors.join(" "));
   }
 
+  const result = new Riichi(toRiichiInput(entry)).calc();
+
+  if (result.error || !result.isAgari) {
+    throw new Error("Winning hand could not be scored as a valid agari.");
+  }
+
+  const yaku = Object.keys(result.yaku).map(toDisplayYakuName);
+  if (yaku.length === 0 || result.han <= 0) {
+    throw new Error("Winning hand has no yaku.");
+  }
+
   const base = {
-    yaku: entry.conditions.includes("riichi") ? ["Riichi"] : [],
-    han: entry.conditions.includes("riichi") ? 1 : 0,
-    fu: 30
+    yaku,
+    han: result.han,
+    fu: result.fu,
+    ...(toLimitLabel(result.name) ? { limit: toLimitLabel(result.name) } : {})
   };
 
   if (entry.winType === "ron") {
-    return { ...base, paymentKind: "ron", ronPayment: 1000 };
+    const [ronPayment] = result.ko;
+    return { ...base, paymentKind: "ron", ronPayment };
   }
 
   if (entry.winType === "tsumo") {
-    return { ...base, paymentKind: "tsumo", dealerTsumoPayment: 500, childTsumoPayment: 300 };
+    const [dealerTsumoPayment, childTsumoPayment] = result.ko;
+    return { ...base, paymentKind: "tsumo", dealerTsumoPayment, childTsumoPayment };
   }
 
   throw new Error("Win type must be ron or tsumo.");
+}
+
+function toRiichiInput(entry: WinEntry): string {
+  const concealedTiles =
+    entry.winType === "ron"
+      ? entry.concealedTiles.map(toRiichiTile).join("")
+      : [...entry.concealedTiles, entry.winningTile].map(toRiichiTile).join("");
+  const winningTile = entry.winType === "ron" ? `+${toRiichiTile(entry.winningTile)}` : "";
+  const melds = entry.melds.map(toRiichiMeld).join("");
+  const dora = toDoraInput([...entry.doraIndicators, ...entry.uraDoraIndicators]);
+  const extra = toExtraOptions(entry);
+
+  return `${concealedTiles}${winningTile}${melds}${dora}${extra}`;
+}
+
+function toRiichiTile(tile: Tile): string {
+  const suffix = tile.suit === "man" ? "m" : tile.suit === "pin" ? "p" : tile.suit === "sou" ? "s" : "z";
+  return `${tile.red ? 0 : tile.value}${suffix}`;
+}
+
+function toRiichiMeld(meld: WinEntry["melds"][number]): string {
+  const suffix = meld.tiles[0].suit === "man" ? "m" : meld.tiles[0].suit === "pin" ? "p" : meld.tiles[0].suit === "sou" ? "s" : "z";
+  const values = meld.tiles.map((tile) => (tile.red ? 0 : tile.value)).sort((a, b) => a - b);
+  const notationValues = meld.type === "closed-kan" ? values.slice(0, 2) : values;
+
+  return `+${notationValues.join("")}${suffix}`;
+}
+
+function toDoraInput(indicators: Tile[]): string {
+  if (indicators.length === 0) {
+    return "";
+  }
+
+  return `+d${indicators.map(nextDoraTile).map(toRiichiTile).join("")}`;
+}
+
+function nextDoraTile(indicator: Tile): Tile {
+  if (indicator.suit === "honor") {
+    if (indicator.value >= 1 && indicator.value <= 4) {
+      return { suit: "honor", value: indicator.value === 4 ? 1 : indicator.value + 1 };
+    }
+
+    return { suit: "honor", value: indicator.value === 7 ? 5 : indicator.value + 1 };
+  }
+
+  return { suit: indicator.suit, value: indicator.value === 9 ? 1 : indicator.value + 1 };
+}
+
+function toExtraOptions(entry: WinEntry): string {
+  const options: string[] = [];
+  if (entry.conditions.includes("riichi")) {
+    options.push("r");
+  }
+
+  return options.length > 0 ? `+${options.join("")}` : "";
+}
+
+function toDisplayYakuName(yaku: string): string {
+  const names: Record<string, string> = {
+    立直: "Riichi",
+    平和: "Pinfu",
+    断么九: "Tanyao",
+    門前清自摸和: "Menzen Tsumo"
+  };
+
+  return names[yaku] ?? yaku;
+}
+
+function toLimitLabel(name: string): LimitLabel | undefined {
+  const labels: Record<string, LimitLabel> = {
+    満貫: "mangan",
+    跳満: "haneman",
+    倍満: "baiman",
+    三倍満: "sanbaiman",
+    数え役満: "yakuman",
+    役満: "yakuman",
+    ダブル役満: "double-yakuman",
+    トリプル役満: "triple-yakuman"
+  };
+
+  return labels[name];
 }
 
 function tileKey(tile: Tile): string {
