@@ -26,28 +26,48 @@ describe("gameState", () => {
   it("prevents riichi below 1000 and otherwise deposits a stick", () => {
     const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
     const afterRiichi = declareRiichi(game, game.players[1].id);
+    const brokeGame = {
+      ...game,
+      players: game.players.map((player, index) => (index === 2 ? { ...player, score: 900 } : player))
+    };
 
     expect(afterRiichi.players[1].score).toBe(24000);
     expect(afterRiichi.players[1].riichi).toBe(true);
     expect(afterRiichi.riichiSticks).toBe(1);
+    expect(afterRiichi.history.at(-1)).toEqual({ type: "riichi", playerId: game.players[1].id });
+    expect(() => declareRiichi(brokeGame, game.players[2].id)).toThrow("A player under 1000 points cannot declare riichi.");
   });
 
   it("rotates dealer after non-tenpai dealer exhaustive draw", () => {
-    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const game = applyDiceRoll(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }), { die1: 1, die2: 2 });
 
     const next = applyExhaustiveDraw(game, [game.players[1].id]);
 
     expect(next.dealerIndex).toBe(1);
     expect(next.players[1].seatWind).toBe("east");
     expect(next.honba).toBe(1);
+    expect(next.currentDice).toBeUndefined();
+    expect(next.players.map((player) => player.score)).toEqual([24000, 28000, 24000, 24000]);
+    expect(next.history.at(-1)).toEqual({ type: "exhaustive-draw", tenpaiPlayerIds: [game.players[1].id] });
+  });
+
+  it("keeps dealer after tenpai dealer exhaustive draw", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+
+    const next = applyExhaustiveDraw(game, [game.players[0].id]);
+
+    expect(next.dealerIndex).toBe(0);
+    expect(next.players[0].seatWind).toBe("east");
   });
 
   it("keeps dealer on abortive draw", () => {
-    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const game = applyDiceRoll(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }), { die1: 1, die2: 1 });
 
     const next = applyAbortiveDraw(game, "suufuu-renda");
 
     expect(next.dealerIndex).toBe(0);
     expect(next.honba).toBe(1);
+    expect(next.currentDice).toBeUndefined();
+    expect(next.history.at(-1)).toEqual({ type: "abortive-draw", drawType: "suufuu-renda" });
   });
 });
