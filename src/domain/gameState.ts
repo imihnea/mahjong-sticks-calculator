@@ -99,6 +99,8 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
 }
 
 export function applyWin(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): GameState {
+  validateWinPayments(game, payments);
+
   const dealerWon = payments.some((payment) => payment.winnerIndex === game.dealerIndex);
   const dealerIndex = rotateDealerAfterHand(game.dealerIndex, dealerWon);
   const roundProgression = advanceRound(game, dealerWon);
@@ -131,6 +133,45 @@ export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): 
     currentDice: undefined,
     history: [...game.history, { type: "abortive-draw", drawType }]
   });
+}
+
+function validateWinPayments(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): void {
+  let playerPaymentCount = 0;
+  let riichiPoolPayment = 0;
+
+  for (const payment of payments) {
+    assertSeatIndex(payment.winnerIndex);
+    assertPayment(payment.amount);
+
+    if (new Set(payment.payerIndexes).size !== payment.payerIndexes.length) {
+      throw new Error("Win payment payers must be unique.");
+    }
+
+    if (payment.payerIndexes.length > 1) {
+      throw new Error("Win payment rows must have one payer, or no payer for riichi pool rows.");
+    }
+
+    for (const payerIndex of payment.payerIndexes) {
+      assertSeatIndex(payerIndex);
+      if (payerIndex === payment.winnerIndex) {
+        throw new Error("Winner cannot pay their own win payment.");
+      }
+    }
+
+    if (payment.payerIndexes.length === 0) {
+      riichiPoolPayment += payment.amount;
+    } else {
+      playerPaymentCount += 1;
+    }
+  }
+
+  if (playerPaymentCount === 0) {
+    throw new Error("Win payments must include at least one player payment.");
+  }
+
+  if (riichiPoolPayment > game.riichiSticks * 1000) {
+    throw new Error("Riichi pool payment cannot exceed the riichi sticks on the table.");
+  }
 }
 
 function applyDeltas(players: Player[], deltas: Array<{ playerIndex: number; delta: number }>): Player[] {
@@ -194,6 +235,18 @@ function toSnapshot(game: GameState): GameStateSnapshot {
     history: structuredClone(game.history),
     ended: game.ended
   };
+}
+
+function assertSeatIndex(index: number): void {
+  if (!Number.isInteger(index) || index < 0 || index > 3) {
+    throw new Error("Player index must be between 0 and 3.");
+  }
+}
+
+function assertPayment(payment: number): void {
+  if (!Number.isInteger(payment) || payment <= 0 || payment % 100 !== 0) {
+    throw new Error("Payment must be a positive multiple of 100.");
+  }
 }
 
 function createId(prefix: string): string {

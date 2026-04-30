@@ -98,6 +98,33 @@ describe("gameState", () => {
     expect(next.honba).toBe(0);
   });
 
+  it("rejects invalid win payment rows before mutating hand state", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+
+    expect(() => applyWin(game, [])).toThrow("Win payments must include at least one player payment.");
+    expect(() => applyWin(game, [{ winnerIndex: 4, payerIndexes: [0], amount: 8000 }])).toThrow("Player index must be between 0 and 3.");
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [4], amount: 8000 }])).toThrow("Player index must be between 0 and 3.");
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [0, 0], amount: 8000 }])).toThrow("Win payment payers must be unique.");
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [1], amount: 8000 }])).toThrow("Winner cannot pay their own win payment.");
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [0, 2], amount: 8000 }])).toThrow(
+      "Win payment rows must have one payer, or no payer for riichi pool rows."
+    );
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [0], amount: -8000 }])).toThrow(
+      "Payment must be a positive multiple of 100."
+    );
+    expect(() => applyWin(game, [{ winnerIndex: 1, payerIndexes: [], amount: 1000 }])).toThrow(
+      "Win payments must include at least one player payment."
+    );
+    expect(() =>
+      applyWin(game, [
+        { winnerIndex: 1, payerIndexes: [0], amount: 8000 },
+        { winnerIndex: 1, payerIndexes: [], amount: 1000 }
+      ])
+    ).toThrow("Riichi pool payment cannot exceed the riichi sticks on the table.");
+    expect(game.handNumber).toBe(1);
+    expect(game.riichiSticks).toBe(0);
+  });
+
   it("rotates dealer and advances the hand after a non-dealer win", () => {
     const game = applyDiceRoll(createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] }), { die1: 1, die2: 2 });
 

@@ -16,4 +16,12 @@ describe("ResultPanel", () => {
     expect(screen.getByText("B")).toBeInTheDocument();
     expect(screen.getByText("28900")).toBeInTheDocument();
   });
+
+  it("shows negative scores without trying to render impossible stick inventory", () => {
+    render(<ResultPanel transfers={[]} inventories={[{ playerName: "A", score: -1200 }]} onClose={() => undefined} />);
+
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("-1200")).toBeInTheDocument();
+    expect(screen.getByText("Debt: 1200 points")).toBeInTheDocument();
+  });
 });

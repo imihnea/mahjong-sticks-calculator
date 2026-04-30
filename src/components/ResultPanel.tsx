@@ -29,17 +29,21 @@ export function ResultPanel({ transfers, inventories, onClose }: ResultPanelProp
 
       <h2>Stick inventory</h2>
       {inventories.map((inventory) => {
-        const sticks = createStickInventory(inventory.score);
+        const sticks = inventory.score >= 0 ? createStickInventory(inventory.score) : null;
         return (
           <article key={inventory.playerName}>
             <h3>{inventory.playerName}</h3>
             <strong>{inventory.score}</strong>
-            <div className="stick-row">
-              <StickIcon value={10000} count={sticks.tenThousand} />
-              <StickIcon value={5000} count={sticks.fiveThousand} />
-              <StickIcon value={1000} count={sticks.thousand} />
-              <StickIcon value={100} count={sticks.hundred} />
-            </div>
+            {sticks ? (
+              <div className="stick-row">
+                <StickIcon value={10000} count={sticks.tenThousand} />
+                <StickIcon value={5000} count={sticks.fiveThousand} />
+                <StickIcon value={1000} count={sticks.thousand} />
+                <StickIcon value={100} count={sticks.hundred} />
+              </div>
+            ) : (
+              <p>Debt: {Math.abs(inventory.score)} points</p>
+            )}
           </article>
         );
       })}
