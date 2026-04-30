@@ -57,12 +57,14 @@ export function HandResultFlow({
     <section className="modal-surface">
       <h2>Winning hand</h2>
       <div className="tile-editor-field">
-        <h3>Concealed tiles</h3>
-        <TileEditor tiles={concealedTiles} onChange={setConcealedTiles} />
+        <TileEditor label="Concealed tiles" tiles={concealedTiles} onChange={setConcealedTiles} />
       </div>
       <div className="tile-editor-field">
-        <h3>Winning tile</h3>
-        <TileEditor tiles={winningTile ? [winningTile] : []} onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)} />
+        <TileEditor
+          label="Winning tile"
+          tiles={winningTile ? [winningTile] : []}
+          onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)}
+        />
       </div>
       {winErrors.map((error) => (
         <p className="field-error" key={error}>

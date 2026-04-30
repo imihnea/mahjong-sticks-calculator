@@ -229,10 +229,16 @@ h1 {
 }
 
 .selected-tiles,
+.tile-editor-actions,
 .tile-keyboard {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.tile-editor-actions button {
+  min-height: 36px;
+  padding: 7px 10px;
 }
 
 .selected-tiles {
@@ -260,7 +266,7 @@ h1 {
 
 .tile-keyboard button {
   min-width: 40px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 7px 9px;
   font-size: 0.86rem;
 }
