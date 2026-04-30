@@ -277,11 +277,18 @@ h1 {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .result-panel h3,
 .result-panel strong {
   overflow-wrap: anywhere;
+}
+
+.result-panel article p {
+  color: rgba(23, 33, 31, 0.72);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .stick-row {
