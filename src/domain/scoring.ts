@@ -1,5 +1,5 @@
 import Riichi from "riichi";
-import type { Tile, WinEntry, WinType } from "./types";
+import type { RoundWind, SeatWind, Tile, WinEntry, WinType } from "./types";
 
 type LimitLabel = "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman" | "double-yakuman" | "triple-yakuman";
 
@@ -20,6 +20,12 @@ export type ScoreBreakdown =
       dealerTsumoPayment: number;
       childTsumoPayment: number;
     });
+
+export interface ScoringContext {
+  roundWind?: RoundWind;
+  seatWind?: SeatWind;
+  dealer?: boolean;
+}
 
 export function validateWinEntry(entry: WinEntry): string[] {
   const errors: string[] = [];
@@ -99,52 +105,56 @@ export function scoreManualLimitHand(input: {
   throw new Error("Win type must be ron or tsumo.");
 }
 
-export async function scoreWinEntry(entry: WinEntry): Promise<ScoreBreakdown> {
+export async function scoreWinEntry(entry: WinEntry, context: ScoringContext = {}): Promise<ScoreBreakdown> {
   const errors = validateWinEntry(entry);
   if (errors.length > 0) {
     throw new Error(errors.join(" "));
   }
 
-  const result = new Riichi(toRiichiInput(entry)).calc();
+  const result = new Riichi(toRiichiInput(entry, context)).calc();
 
   if (result.error || !result.isAgari) {
     throw new Error("Winning hand could not be scored as a valid agari.");
   }
 
   const yaku = Object.keys(result.yaku).map(toDisplayYakuName);
-  if (yaku.length === 0 || result.han <= 0) {
+  if (yaku.length === 0 || (result.han <= 0 && result.yakuman <= 0)) {
     throw new Error("Winning hand has no yaku.");
   }
 
+  const seatWind = resolveSeatWind(context);
+  const isDealerWin = seatWind === "east";
+  const limit = toLimitLabel(result.name, result.yakuman);
   const base = {
     yaku,
-    han: result.han,
+    han: result.yakuman > 0 ? result.yakuman * 13 : result.han,
     fu: result.fu,
-    ...(toLimitLabel(result.name) ? { limit: toLimitLabel(result.name) } : {})
+    ...(limit ? { limit } : {})
   };
 
   if (entry.winType === "ron") {
-    const [ronPayment] = result.ko;
+    const [ronPayment] = isDealerWin ? result.oya : result.ko;
     return { ...base, paymentKind: "ron", ronPayment };
   }
 
   if (entry.winType === "tsumo") {
-    const [dealerTsumoPayment, childTsumoPayment] = result.ko;
+    const [dealerTsumoPayment, childTsumoPayment] = isDealerWin ? [result.oya[0], result.oya[0]] : result.ko;
     return { ...base, paymentKind: "tsumo", dealerTsumoPayment, childTsumoPayment };
   }
 
   throw new Error("Win type must be ron or tsumo.");
 }
 
-function toRiichiInput(entry: WinEntry): string {
+function toRiichiInput(entry: WinEntry, context: ScoringContext): string {
   const concealedTiles =
     entry.winType === "ron"
       ? entry.concealedTiles.map(toRiichiTile).join("")
       : [...entry.concealedTiles, entry.winningTile].map(toRiichiTile).join("");
   const winningTile = entry.winType === "ron" ? `+${toRiichiTile(entry.winningTile)}` : "";
   const melds = entry.melds.map(toRiichiMeld).join("");
-  const dora = toDoraInput([...entry.doraIndicators, ...entry.uraDoraIndicators]);
-  const extra = toExtraOptions(entry);
+  const doraIndicators = canCountUraDora(entry) ? [...entry.doraIndicators, ...entry.uraDoraIndicators] : entry.doraIndicators;
+  const dora = toDoraInput(doraIndicators);
+  const extra = toExtraOptions(entry, context);
 
   return `${concealedTiles}${winningTile}${melds}${dora}${extra}`;
 }
@@ -156,7 +166,7 @@ function toRiichiTile(tile: Tile): string {
 
 function toRiichiMeld(meld: WinEntry["melds"][number]): string {
   const suffix = meld.tiles[0].suit === "man" ? "m" : meld.tiles[0].suit === "pin" ? "p" : meld.tiles[0].suit === "sou" ? "s" : "z";
-  const values = meld.tiles.map((tile) => (tile.red ? 0 : tile.value)).sort((a, b) => a - b);
+  const values = [...meld.tiles].sort((a, b) => a.value - b.value).map((tile) => (tile.red ? 0 : tile.value));
   const notationValues = meld.type === "closed-kan" ? values.slice(0, 2) : values;
 
   return `+${notationValues.join("")}${suffix}`;
@@ -182,13 +192,68 @@ function nextDoraTile(indicator: Tile): Tile {
   return { suit: indicator.suit, value: indicator.value === 9 ? 1 : indicator.value + 1 };
 }
 
-function toExtraOptions(entry: WinEntry): string {
+function toExtraOptions(entry: WinEntry, context: ScoringContext): string {
   const options: string[] = [];
-  if (entry.conditions.includes("riichi")) {
+  if (entry.conditions.includes("double-riichi")) {
+    options.push("w");
+  } else if (entry.conditions.includes("riichi")) {
     options.push("r");
+  }
+  if (entry.conditions.includes("ippatsu")) {
+    options.push("i");
+  }
+  if (entry.conditions.includes("haitei") || entry.conditions.includes("houtei")) {
+    options.push("h");
+  }
+  if (entry.conditions.includes("rinshan") || entry.conditions.includes("chankan")) {
+    options.push("k");
+  }
+  if (entry.conditions.includes("tenhou") || entry.conditions.includes("chiihou")) {
+    options.push("t");
+  }
+
+  const windOptions = toWindOptions(context);
+  if (windOptions) {
+    options.push(windOptions);
   }
 
   return options.length > 0 ? `+${options.join("")}` : "";
+}
+
+function canCountUraDora(entry: WinEntry): boolean {
+  return entry.conditions.includes("riichi") || entry.conditions.includes("double-riichi");
+}
+
+function toWindOptions(context: ScoringContext): string {
+  const seatWind = resolveSeatWind(context);
+  if (!context.roundWind && !seatWind) {
+    return "";
+  }
+
+  return `${toRiichiWind(context.roundWind ?? "east")}${toRiichiWind(seatWind ?? "south")}`;
+}
+
+function resolveSeatWind(context: ScoringContext): SeatWind | undefined {
+  if (context.seatWind) {
+    return context.seatWind;
+  }
+
+  if (context.dealer !== undefined) {
+    return context.dealer ? "east" : "south";
+  }
+
+  return undefined;
+}
+
+function toRiichiWind(wind: RoundWind | SeatWind): string {
+  const winds: Record<RoundWind | SeatWind, string> = {
+    east: "1",
+    south: "2",
+    west: "3",
+    north: "4"
+  };
+
+  return winds[wind];
 }
 
 function toDisplayYakuName(yaku: string): string {
@@ -202,7 +267,17 @@ function toDisplayYakuName(yaku: string): string {
   return names[yaku] ?? yaku;
 }
 
-function toLimitLabel(name: string): LimitLabel | undefined {
+function toLimitLabel(name: string, yakuman: number): LimitLabel | undefined {
+  if (yakuman >= 3) {
+    return "triple-yakuman";
+  }
+  if (yakuman === 2) {
+    return "double-yakuman";
+  }
+  if (yakuman === 1) {
+    return "yakuman";
+  }
+
   const labels: Record<string, LimitLabel> = {
     満貫: "mangan",
     跳満: "haneman",

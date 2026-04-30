@@ -147,9 +147,11 @@ describe("scoring adapter", () => {
     expect(result.paymentKind).toBe("ron");
     expect(result.yaku).toContain("Riichi");
     expect(result.yaku).toContain("Pinfu");
-    expect(result.han).toBeGreaterThanOrEqual(1);
+    expect(result.yaku).toContain("Tanyao");
+    expect(result.han).toBe(3);
+    expect(result.fu).toBe(30);
     if (result.paymentKind === "ron") {
-      expect(result.ronPayment).toBeGreaterThan(0);
+      expect(result.ronPayment).toBe(3900);
     }
   });
 
@@ -175,6 +177,161 @@ describe("scoring adapter", () => {
       childTsumoPayment: 1300
     });
     await expect(scoreWinEntry(tsumoEntry)).resolves.not.toHaveProperty("ronPayment");
+  });
+
+  it("uses dealer payments when the winner seat wind is east", async () => {
+    await expect(scoreWinEntry(baseWinEntry, { roundWind: "east", seatWind: "east" })).resolves.toMatchObject({
+      paymentKind: "ron",
+      ronPayment: 5800
+    });
+    await expect(scoreWinEntry(baseWinEntry, { dealer: true })).resolves.toMatchObject({
+      paymentKind: "ron",
+      ronPayment: 5800
+    });
+
+    const dealerTsumo: WinEntry = {
+      ...baseWinEntry,
+      winType: "tsumo",
+      discarderId: undefined
+    };
+    await expect(scoreWinEntry(dealerTsumo, { roundWind: "east", seatWind: "east" })).resolves.toMatchObject({
+      paymentKind: "tsumo",
+      dealerTsumoPayment: 2600,
+      childTsumoPayment: 2600
+    });
+  });
+
+  it("passes seat wind context through for wind yaku detection", async () => {
+    const northSeatWindEntry: WinEntry = {
+      winnerId: "p1",
+      winType: "ron",
+      discarderId: "p2",
+      winningTile: { suit: "pin", value: 5 },
+      concealedTiles: [
+        { suit: "honor", value: 4 },
+        { suit: "honor", value: 4 },
+        { suit: "honor", value: 4 },
+        { suit: "man", value: 2 },
+        { suit: "man", value: 3 },
+        { suit: "man", value: 4 },
+        { suit: "pin", value: 2 },
+        { suit: "pin", value: 3 },
+        { suit: "pin", value: 4 },
+        { suit: "sou", value: 6 },
+        { suit: "sou", value: 7 },
+        { suit: "sou", value: 8 },
+        { suit: "pin", value: 5 }
+      ],
+      melds: [],
+      doraIndicators: [],
+      uraDoraIndicators: [],
+      conditions: []
+    };
+
+    await expect(scoreWinEntry(northSeatWindEntry)).rejects.toThrow("Winning hand has no yaku.");
+    await expect(scoreWinEntry(northSeatWindEntry, { roundWind: "east", seatWind: "north" })).resolves.toMatchObject({
+      yaku: ["自風北"],
+      han: 1,
+      fu: 40,
+      paymentKind: "ron",
+      ronPayment: 1300
+    });
+  });
+
+  it("does not count ura dora unless riichi or double riichi is declared", async () => {
+    const uraIndicatorEntry: WinEntry = {
+      ...baseWinEntry,
+      conditions: [],
+      uraDoraIndicators: [{ suit: "man", value: 1 }]
+    };
+
+    await expect(scoreWinEntry(uraIndicatorEntry)).resolves.toMatchObject({
+      han: 2,
+      ronPayment: 2000
+    });
+  });
+
+  it("counts ura dora after riichi", async () => {
+    await expect(scoreWinEntry({ ...baseWinEntry, uraDoraIndicators: [{ suit: "man", value: 1 }] })).resolves.toMatchObject({
+      han: 4,
+      ronPayment: 7700
+    });
+  });
+
+  it("scores yakuman hands even though the library reports zero han", async () => {
+    const kokushi: WinEntry = {
+      winnerId: "p1",
+      winType: "ron",
+      discarderId: "p2",
+      winningTile: { suit: "man", value: 1 },
+      concealedTiles: [
+        { suit: "man", value: 1 },
+        { suit: "man", value: 9 },
+        { suit: "pin", value: 1 },
+        { suit: "pin", value: 9 },
+        { suit: "sou", value: 1 },
+        { suit: "sou", value: 9 },
+        { suit: "honor", value: 1 },
+        { suit: "honor", value: 2 },
+        { suit: "honor", value: 3 },
+        { suit: "honor", value: 4 },
+        { suit: "honor", value: 5 },
+        { suit: "honor", value: 6 },
+        { suit: "honor", value: 7 }
+      ],
+      melds: [],
+      doraIndicators: [],
+      uraDoraIndicators: [],
+      conditions: []
+    };
+
+    await expect(scoreWinEntry(kokushi)).resolves.toMatchObject({
+      han: 26,
+      fu: 0,
+      limit: "double-yakuman",
+      paymentKind: "ron",
+      ronPayment: 64000
+    });
+  });
+
+  it("sorts red fives by face value when serializing chi melds", async () => {
+    const openTanyao: WinEntry = {
+      winnerId: "p1",
+      winType: "ron",
+      discarderId: "p2",
+      winningTile: { suit: "pin", value: 5 },
+      concealedTiles: [
+        { suit: "pin", value: 2 },
+        { suit: "pin", value: 3 },
+        { suit: "pin", value: 4 },
+        { suit: "sou", value: 2 },
+        { suit: "sou", value: 3 },
+        { suit: "sou", value: 4 },
+        { suit: "sou", value: 6 },
+        { suit: "sou", value: 7 },
+        { suit: "sou", value: 8 },
+        { suit: "pin", value: 5 }
+      ],
+      melds: [
+        {
+          type: "chi",
+          tiles: [
+            { suit: "man", value: 4 },
+            { suit: "man", value: 5, red: true },
+            { suit: "man", value: 6 }
+          ]
+        }
+      ],
+      doraIndicators: [],
+      uraDoraIndicators: [],
+      conditions: []
+    };
+
+    await expect(scoreWinEntry(openTanyao)).resolves.toMatchObject({
+      han: 2,
+      paymentKind: "ron",
+      ronPayment: 2000
+    });
   });
 
   it("rejects invalid runtime win type shapes", async () => {
