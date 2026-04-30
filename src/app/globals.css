@@ -402,7 +402,8 @@ h1 {
 .stick-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 5px 8px;
 }
 
 .payment-cross {
@@ -445,33 +446,29 @@ h1 {
   padding-left: 8px;
 }
 
-.stick {
+.stick-stack {
   display: inline-flex;
-  min-height: 28px;
+  flex-wrap: wrap;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 8px;
-  background: white;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1;
+  gap: 4px;
 }
 
-.stick-10000 {
-  border-color: #303030;
+.stick-image {
+  display: block;
+  width: 74px;
+  height: 17px;
+  object-fit: contain;
+  user-select: none;
 }
 
-.stick-5000 {
-  border-color: #d94836;
+.result-panel > article .stick-image {
+  width: 92px;
+  height: 22px;
 }
 
-.stick-1000 {
-  border-color: #2457a6;
-}
-
-.stick-100 {
-  border-color: #d6a526;
+.payment-seat .stick-image {
+  width: 70px;
+  height: 16px;
 }
 
 .player-seat {
