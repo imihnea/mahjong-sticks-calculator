@@ -61,10 +61,8 @@ export interface Meld {
   tiles: Tile[];
 }
 
-export interface WinEntry {
+interface BaseWinEntry {
   winnerId: PlayerId;
-  winType: WinType;
-  discarderId?: PlayerId;
   winningTile: Tile;
   concealedTiles: Tile[];
   melds: Meld[];
@@ -72,6 +70,16 @@ export interface WinEntry {
   uraDoraIndicators: Tile[];
   conditions: WinCondition[];
 }
+
+export type WinEntry =
+  | (BaseWinEntry & {
+      winType: "ron";
+      discarderId: PlayerId;
+    })
+  | (BaseWinEntry & {
+      winType: "tsumo";
+      discarderId?: never;
+    });
 
 export type WinCondition =
   | "riichi"
