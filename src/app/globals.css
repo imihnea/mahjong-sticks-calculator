@@ -363,111 +363,12 @@ h1 {
   display: block;
   width: 42px;
   height: 58px;
-  overflow: visible;
+  object-fit: contain;
 }
 
 .selected-tiles .tile-face {
   width: 36px;
   height: 50px;
-}
-
-.tile-face-shadow {
-  fill: rgba(55, 75, 66, 0.2);
-}
-
-.tile-face-body {
-  fill: #fffdf4;
-  stroke: #d5ccb7;
-  stroke-width: 1.4;
-}
-
-.tile-face-red .tile-face-body {
-  stroke: rgba(230, 74, 57, 0.68);
-}
-
-.tile-pip-green {
-  fill: #12785e;
-}
-
-.tile-pip-blue {
-  fill: #1f5f99;
-}
-
-.tile-pip-red {
-  fill: #d83a2e;
-}
-
-.tile-pip-core {
-  fill: #fffdf4;
-}
-
-.tile-bamboo-green {
-  color: #12785e;
-}
-
-.tile-bamboo-blue {
-  color: #1f5f99;
-}
-
-.tile-bamboo-red {
-  color: #d83a2e;
-}
-
-.tile-bamboo rect {
-  fill: currentColor;
-}
-
-.tile-bamboo line {
-  stroke: #fffdf4;
-  stroke-linecap: round;
-  stroke-width: 1.4;
-}
-
-.tile-man-number,
-.tile-man-suit,
-.tile-honor {
-  font-family: ui-serif, Georgia, "Times New Roman", serif;
-  font-weight: 900;
-}
-
-.tile-man-number {
-  fill: #15231f;
-  font-size: 25px;
-}
-
-.tile-man-suit {
-  fill: #cf3028;
-  font-size: 21px;
-}
-
-.tile-man-red {
-  fill: #cf3028;
-}
-
-.tile-honor {
-  font-size: 31px;
-}
-
-.tile-honor-1,
-.tile-honor-2,
-.tile-honor-3,
-.tile-honor-4,
-.tile-honor-5 {
-  fill: #15231f;
-}
-
-.tile-honor-6 {
-  fill: #13794d;
-}
-
-.tile-honor-7 {
-  fill: #cf3028;
-}
-
-.tile-white-dragon-frame {
-  fill: transparent;
-  stroke: #1f5f99;
-  stroke-width: 2.2;
 }
 
 .result-panel article {

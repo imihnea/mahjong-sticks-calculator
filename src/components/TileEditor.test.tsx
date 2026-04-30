@@ -22,6 +22,8 @@ describe("TileEditor", () => {
     expect(within(redMan).getByRole("img", { name: "0m tile" })).toBeInTheDocument();
     expect(within(redPin).getByRole("img", { name: "0p tile" })).toBeInTheDocument();
     expect(within(redSou).getByRole("img", { name: "0s tile" })).toBeInTheDocument();
+    expect(within(oneMan).getByRole("img", { name: "1m tile" })).toHaveAttribute("src", "/tiles/riichi/Man1.png");
+    expect(within(redMan).getByRole("img", { name: "0m tile" })).toHaveAttribute("src", "/tiles/riichi/Man5-Dora.png");
     expect(oneMan).not.toHaveTextContent("1m");
   });
 
