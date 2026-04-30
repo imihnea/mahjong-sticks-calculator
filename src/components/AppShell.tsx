@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, createNewGame, declareRiichi } from "@/domain/gameState";
+import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi } from "@/domain/gameState";
 import type { AbortiveDrawType, GameLength, GameState } from "@/domain/types";
 import { loadSavedGame, saveGame } from "@/storage/gameStorage";
 import { DicePanel } from "./DicePanel";
@@ -81,6 +81,11 @@ export function AppShell() {
           onClose={() => setActiveFlow(null)}
           onApplyExhaustiveDraw={(ids) => updateGame(applyExhaustiveDraw(game, ids))}
           onApplyAbortiveDraw={(drawType: AbortiveDrawType) => updateGame(applyAbortiveDraw(game, drawType))}
+          onApplyWin={(payments) => {
+            const nextGame = applyWin(game, payments);
+            setGame(nextGame);
+            return nextGame;
+          }}
         />
       ) : null}
     </main>

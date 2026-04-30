@@ -98,6 +98,29 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
   );
 }
 
+export function applyWin(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): GameState {
+  const dealerWon = payments.some((payment) => payment.winnerIndex === game.dealerIndex);
+  const dealerIndex = rotateDealerAfterHand(game.dealerIndex, dealerWon);
+  const players = game.players.map((player, index) => {
+    const won = payments.filter((payment) => payment.winnerIndex === index).reduce((sum, payment) => sum + payment.amount, 0);
+    const paid = payments.filter((payment) => payment.payerIndexes.includes(index)).reduce((sum, payment) => sum + payment.amount, 0);
+    return { ...player, score: player.score + won - paid, riichi: false };
+  });
+
+  return withSnapshot(
+    game,
+    refreshSeats({
+      ...game,
+      players,
+      dealerIndex,
+      honba: dealerWon ? game.honba + 1 : 0,
+      riichiSticks: 0,
+      currentDice: undefined,
+      history: [...game.history, { type: "win", entries: [] }]
+    })
+  );
+}
+
 export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): GameState {
   return withSnapshot(game, {
     ...game,

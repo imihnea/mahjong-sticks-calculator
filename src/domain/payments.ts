@@ -33,6 +33,14 @@ export function ronDeltas(input: {
   ];
 }
 
+export function nearestWinnerForRiichiDeposit(input: { discarderIndex: number; winnerIndexes: number[] }): number {
+  for (let offset = 1; offset <= 3; offset += 1) {
+    const candidate = (input.discarderIndex + offset) % 4;
+    if (input.winnerIndexes.includes(candidate)) return candidate;
+  }
+  throw new Error("No winner found for riichi deposit.");
+}
+
 export function tsumoDeltas(input: {
   winnerIndex: number;
   dealerIndex: number;

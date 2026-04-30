@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, createNewGame, declareRiichi } from "./gameState";
+import { applyAbortiveDraw, applyDiceRoll, applyExhaustiveDraw, applyWin, createNewGame, declareRiichi } from "./gameState";
 
 describe("gameState", () => {
   it("creates a Mahjong Soul East game with winds and dealer marker", () => {
@@ -88,6 +88,14 @@ describe("gameState", () => {
 
     expect(next.riichiSticks).toBe(1);
     expect(next.players.every((player) => !player.riichi)).toBe(true);
+  });
+
+  it("clears riichi sticks after a win", async () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const withRiichi = declareRiichi(game, game.players[1].id);
+    const next = applyWin(withRiichi, [{ winnerIndex: 2, payerIndexes: [0], amount: 8000 }]);
+    expect(next.riichiSticks).toBe(0);
+    expect(next.honba).toBe(0);
   });
 
   it("advances round wind after four dealer rotations", () => {

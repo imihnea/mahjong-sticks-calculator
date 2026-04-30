@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyHonba, exhaustiveDrawDeltas, ronDeltas, tsumoDeltas } from "./payments";
+import { applyHonba, exhaustiveDrawDeltas, nearestWinnerForRiichiDeposit, ronDeltas, tsumoDeltas } from "./payments";
 
 describe("payments", () => {
   it("applies ron deltas from one discarder to one winner", () => {
@@ -7,6 +7,11 @@ describe("payments", () => {
       { playerIndex: 1, delta: 9000 },
       { playerIndex: 3, delta: -8000 }
     ]);
+  });
+
+  it("finds nearest winner from discarder turn order", () => {
+    expect(nearestWinnerForRiichiDeposit({ discarderIndex: 0, winnerIndexes: [2, 3] })).toBe(2);
+    expect(nearestWinnerForRiichiDeposit({ discarderIndex: 2, winnerIndexes: [0, 1] })).toBe(0);
   });
 
   it("adds 300 per honba to ron payment", () => {

@@ -13,10 +13,11 @@ export function ResultPanel({ transfers, inventories, onClose }: ResultPanelProp
   return (
     <section className="result-panel">
       <h2>Payment now</h2>
-      {transfers.map((transfer) => {
+      {transfers.length === 0 ? <p>No immediate payments.</p> : null}
+      {transfers.map((transfer, index) => {
         const sticks = describeTransferSticks(transfer.amount);
         return (
-          <article key={`${transfer.from}-${transfer.to}-${transfer.amount}`}>
+          <article key={`${transfer.from}-${transfer.to}-${transfer.amount}-${index}`}>
             <h3>
               {transfer.from} pays {transfer.to}
             </h3>

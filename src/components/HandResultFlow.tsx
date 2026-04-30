@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { validateWinEntry } from "@/domain/scoring";
+import { applyHonba, nearestWinnerForRiichiDeposit } from "@/domain/payments";
+import { scoreWinEntry, validateWinEntry } from "@/domain/scoring";
 import type { AbortiveDrawType, GameState, Tile, WinEntry } from "@/domain/types";
+import { ResultPanel } from "./ResultPanel";
 import { TileEditor } from "./TileEditor";
+
+export interface WinPayment {
+  winnerIndex: number;
+  payerIndexes: number[];
+  amount: number;
+}
 
 interface HandResultFlowProps {
   game: GameState;
@@ -11,6 +19,7 @@ interface HandResultFlowProps {
   onClose: () => void;
   onApplyExhaustiveDraw: (tenpaiPlayerIds: string[]) => void;
   onApplyAbortiveDraw: (drawType: AbortiveDrawType) => void;
+  onApplyWin?: (payments: WinPayment[]) => GameState;
 }
 
 export function HandResultFlow({
@@ -18,11 +27,18 @@ export function HandResultFlow({
   mode,
   onClose,
   onApplyExhaustiveDraw,
-  onApplyAbortiveDraw
+  onApplyAbortiveDraw,
+  onApplyWin
 }: HandResultFlowProps) {
   const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
   const [winningTile, setWinningTile] = useState<Tile | null>(null);
   const [photoReference, setPhotoReference] = useState<File | null>(null);
+  const [result, setResult] = useState<{
+    transfers: Array<{ from: string; to: string; amount: number }>;
+    inventories: Array<{ playerName: string; score: number }>;
+  } | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
 
   if (mode === "draw") {
     return (
@@ -50,6 +66,10 @@ export function HandResultFlow({
         <button onClick={onClose}>Cancel</button>
       </section>
     );
+  }
+
+  if (result) {
+    return <ResultPanel transfers={result.transfers} inventories={result.inventories} onClose={onClose} />;
   }
 
   const winErrors = getWinEntryErrors(game, concealedTiles, winningTile);
@@ -82,27 +102,156 @@ export function HandResultFlow({
           {error}
         </p>
       ))}
-      <button disabled={winErrors.length > 0} onClick={onClose}>
-        Apply
+      {applyError ? <p className="field-error">{applyError}</p> : null}
+      <button
+        disabled={winErrors.length > 0 || isApplying}
+        onClick={() => {
+          void applyScoredWin({
+            game,
+            concealedTiles,
+            winningTile,
+            onApplyWin,
+            setApplyError,
+            setIsApplying,
+            setResult
+          });
+        }}
+      >
+        {isApplying ? "Scoring..." : "Apply"}
       </button>
       <button onClick={onClose}>Cancel</button>
     </section>
   );
 }
 
+async function applyScoredWin(input: {
+  game: GameState;
+  concealedTiles: Tile[];
+  winningTile: Tile | null;
+  onApplyWin?: (payments: WinPayment[]) => GameState;
+  setApplyError: (error: string | null) => void;
+  setIsApplying: (isApplying: boolean) => void;
+  setResult: (result: {
+    transfers: Array<{ from: string; to: string; amount: number }>;
+    inventories: Array<{ playerName: string; score: number }>;
+  }) => void;
+}) {
+  const entry = createProvisionalWinEntry(input.game, input.concealedTiles, input.winningTile);
+  if (!entry) return;
+
+  const winnerIndex = input.game.players.findIndex((player) => player.id === entry.winnerId);
+  const discarderIndex = entry.winType === "ron" ? input.game.players.findIndex((player) => player.id === entry.discarderId) : -1;
+  if (winnerIndex === -1 || (entry.winType === "ron" && discarderIndex === -1)) return;
+
+  input.setApplyError(null);
+  input.setIsApplying(true);
+
+  try {
+    const score = await scoreWinEntry(entry, {
+      roundWind: input.game.roundWind,
+      seatWind: input.game.players[winnerIndex].seatWind,
+      dealer: winnerIndex === input.game.dealerIndex
+    });
+    const payments = paymentsFromScore({
+      game: input.game,
+      winnerIndex,
+      discarderIndex,
+      score
+    });
+    const nextGame = input.onApplyWin?.(payments) ?? previewAppliedPayments(input.game, payments);
+
+    input.setResult({
+      transfers: transfersFromPayments(input.game, payments),
+      inventories: nextGame.players.map((player) => ({ playerName: player.name, score: player.score }))
+    });
+  } catch (error) {
+    input.setApplyError(error instanceof Error ? error.message : "Winning hand could not be applied.");
+  } finally {
+    input.setIsApplying(false);
+  }
+}
+
+function paymentsFromScore(input: {
+  game: GameState;
+  winnerIndex: number;
+  discarderIndex: number;
+  score: Awaited<ReturnType<typeof scoreWinEntry>>;
+}): WinPayment[] {
+  const payments: WinPayment[] = [];
+
+  if (input.score.paymentKind === "ron") {
+      payments.push({
+        winnerIndex: input.winnerIndex,
+        payerIndexes: [input.discarderIndex],
+        amount: applyHonba(input.score.ronPayment, "ron", input.game.honba)
+      });
+  } else {
+    const payerIndexes = input.game.players.map((_, index) => index).filter((index) => index !== input.winnerIndex);
+    for (const payerIndex of payerIndexes) {
+      const baseAmount = payerIndex === input.game.dealerIndex ? input.score.dealerTsumoPayment : input.score.childTsumoPayment;
+      payments.push({ winnerIndex: input.winnerIndex, payerIndexes: [payerIndex], amount: applyHonba(baseAmount, "tsumo", input.game.honba) });
+    }
+  }
+
+  if (input.game.riichiSticks > 0) {
+    const depositWinnerIndex =
+      input.score.paymentKind === "ron"
+        ? nearestWinnerForRiichiDeposit({ discarderIndex: input.discarderIndex, winnerIndexes: [input.winnerIndex] })
+        : input.winnerIndex;
+    payments.push({ winnerIndex: depositWinnerIndex, payerIndexes: [], amount: input.game.riichiSticks * 1000 });
+  }
+
+  return payments;
+}
+
+function transfersFromPayments(game: GameState, payments: WinPayment[]): Array<{ from: string; to: string; amount: number }> {
+  return payments.flatMap((payment) => {
+    const winnerName = game.players[payment.winnerIndex]?.name ?? `Player ${payment.winnerIndex + 1}`;
+    if (payment.payerIndexes.length === 0) {
+      return [{ from: "Riichi pool", to: winnerName, amount: payment.amount }];
+    }
+
+    return payment.payerIndexes.map((payerIndex) => ({
+      from: game.players[payerIndex]?.name ?? `Player ${payerIndex + 1}`,
+      to: winnerName,
+      amount: payment.amount
+    }));
+  });
+}
+
+function previewAppliedPayments(game: GameState, payments: WinPayment[]): GameState {
+  return {
+    ...game,
+    players: game.players.map((player, index) => {
+      const won = payments.filter((payment) => payment.winnerIndex === index).reduce((sum, payment) => sum + payment.amount, 0);
+      const paid = payments.filter((payment) => payment.payerIndexes.includes(index)).reduce((sum, payment) => sum + payment.amount, 0);
+      return { ...player, score: player.score + won - paid };
+    })
+  };
+}
+
 function getWinEntryErrors(game: GameState, concealedTiles: Tile[], winningTile: Tile | null): string[] {
-  if (!winningTile) {
+  const provisionalEntry = createProvisionalWinEntry(game, concealedTiles, winningTile);
+  if (!provisionalEntry) {
     return ["Choose a winning tile."];
+  }
+
+  return validateWinEntry(provisionalEntry);
+}
+
+function createProvisionalWinEntry(game: GameState, concealedTiles: Tile[], winningTile: Tile | null): WinEntry | null {
+  if (!winningTile) {
+    return null;
   }
 
   const winnerId = game.players[0]?.id;
   const discarderId = game.players[1]?.id;
 
   if (!winnerId || !discarderId) {
-    return ["A winning hand needs at least two players in the game."];
+    return null;
   }
 
-  const provisionalEntry: WinEntry = {
+  return {
     winnerId,
     winType: "ron",
     discarderId,
@@ -113,6 +262,4 @@ function getWinEntryErrors(game: GameState, concealedTiles: Tile[], winningTile:
     uraDoraIndicators: [],
     conditions: []
   };
-
-  return validateWinEntry(provisionalEntry);
 }
