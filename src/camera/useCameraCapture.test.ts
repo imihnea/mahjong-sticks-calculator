@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { createElement, StrictMode, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cameraUnavailableMessage, supportsCameraCapture, useCameraCapture } from "./useCameraCapture";
+import { cameraUnavailableMessage, captureVideoFrame, supportsCameraCapture, useCameraCapture } from "./useCameraCapture";
 
 describe("camera helpers", () => {
   afterEach(() => {
@@ -12,8 +12,26 @@ describe("camera helpers", () => {
     expect(supportsCameraCapture({ mediaDevices: undefined })).toBe(false);
   });
 
+  it("captures the current video frame into a data URL", () => {
+    const drawImage = vi.fn();
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ drawImage })),
+      toDataURL: vi.fn(() => "data:image/jpeg;base64,captured")
+    } as unknown as HTMLCanvasElement;
+    const video = { videoWidth: 1280, videoHeight: 720 } as HTMLVideoElement;
+
+    const result = captureVideoFrame(video, () => canvas);
+
+    expect(canvas.width).toBe(1280);
+    expect(canvas.height).toBe(720);
+    expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 1280, 720);
+    expect(result).toBe("data:image/jpeg;base64,captured");
+  });
+
   it("explains secure-context requirement", () => {
-    expect(cameraUnavailableMessage(false)).toBe("Camera capture requires HTTPS or localhost. Use photo upload instead.");
+    expect(cameraUnavailableMessage(false)).toBe("Camera capture requires HTTPS or localhost.");
   });
 
   it("stops the previous stream before replacing it", async () => {
@@ -65,7 +83,7 @@ describe("camera helpers", () => {
     await act(async () => {
       await result.current.start();
     });
-    expect(result.current.error).toBe("Camera permission was denied or no camera is available. Use photo upload instead.");
+    expect(result.current.error).toBe("Camera permission was denied or no camera is available.");
 
     await act(async () => {
       await result.current.start();

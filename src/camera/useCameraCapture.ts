@@ -10,8 +10,23 @@ export function supportsCameraCapture(
 
 export function cameraUnavailableMessage(isSecureContext: boolean): string {
   return isSecureContext
-    ? "Camera permission was denied or no camera is available. Use photo upload instead."
-    : "Camera capture requires HTTPS or localhost. Use photo upload instead.";
+    ? "Camera permission was denied or no camera is available."
+    : "Camera capture requires HTTPS or localhost.";
+}
+
+export function captureVideoFrame(video: HTMLVideoElement, createCanvas = () => document.createElement("canvas")): string | null {
+  const width = video.videoWidth;
+  const height = video.videoHeight;
+  if (width <= 0 || height <= 0) return null;
+
+  const canvas = createCanvas();
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  context.drawImage(video, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.92);
 }
 
 export function useCameraCapture() {
@@ -77,6 +92,10 @@ export function useCameraCapture() {
     },
     [stopCurrentStream]
   );
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream;
+  }, [stream]);
 
   return { videoRef, stream, error, start, stop };
 }

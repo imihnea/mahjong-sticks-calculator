@@ -11,6 +11,8 @@ describe("HandResultFlow", () => {
     renderWinFlow();
 
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open camera" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Photo reference (not saved)")).not.toBeInTheDocument();
 
     chooseTiles("Concealed tiles", ["2m", "3m", "4m", "2p", "3p", "4p", "2s", "3s", "4s", "6m", "7m", "8m", "1z"]);
     chooseTiles("Winning tile", ["3m"]);

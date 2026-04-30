@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { captureVideoFrame, useCameraCapture } from "@/camera/useCameraCapture";
 import { applyHonba, nearestWinnerForRiichiDeposit } from "@/domain/payments";
 import { scoreWinEntry, validateWinEntry } from "@/domain/scoring";
 import type { AbortiveDrawType, GameState, PlayerId, SeatWind, Tile, WinEntry, WinType } from "@/domain/types";
+import { recognizeTileCodesFromImage } from "@/ocr/tileOcr";
 import { ResultPanel } from "./ResultPanel";
 import { TileEditor } from "./TileEditor";
 
@@ -30,9 +32,13 @@ export function HandResultFlow({
   onApplyAbortiveDraw,
   onApplyWin
 }: HandResultFlowProps) {
+  const camera = useCameraCapture();
   const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
   const [winningTile, setWinningTile] = useState<Tile | null>(null);
-  const [photoReference, setPhotoReference] = useState<File | null>(null);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [isRecognizing, setIsRecognizing] = useState(false);
   const [winnerId, setWinnerId] = useState<PlayerId>(game.players[0]?.id ?? "");
   const [winType, setWinType] = useState<WinType>("ron");
   const [discarderId, setDiscarderId] = useState<PlayerId>(game.players[1]?.id ?? "");
@@ -151,16 +157,61 @@ export function HandResultFlow({
           onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)}
         />
       </div>
-      <label>
-        Photo reference (not saved)
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(event) => setPhotoReference(event.target.files?.[0] ?? null)}
-        />
-      </label>
-      {photoReference ? <p>{photoReference.name}</p> : null}
+      <div className="camera-panel">
+        <button type="button" onClick={() => void camera.start()}>
+          Open camera
+        </button>
+        {camera.stream ? (
+          <>
+            <video ref={camera.videoRef} autoPlay muted playsInline aria-label="Camera preview" />
+            <div className="action-row">
+              <button
+                type="button"
+                onClick={() => {
+                  const photo = camera.videoRef.current ? captureVideoFrame(camera.videoRef.current) : null;
+                  if (!photo) {
+                    setOcrError("Camera image is not ready yet.");
+                    return;
+                  }
+                  setCapturedPhoto(photo);
+                  setOcrText(null);
+                  setOcrError(null);
+                  camera.stop();
+                }}
+              >
+                Take photo
+              </button>
+              <button type="button" onClick={camera.stop}>
+                Close camera
+              </button>
+            </div>
+          </>
+        ) : null}
+        {capturedPhoto ? (
+          <>
+            <img alt="Captured winning hand" className="captured-photo" src={capturedPhoto} />
+            <button
+              type="button"
+              disabled={isRecognizing}
+              onClick={() => {
+                void applyOcrResult({
+                  image: capturedPhoto,
+                  setConcealedTiles,
+                  setWinningTile,
+                  setOcrText,
+                  setOcrError,
+                  setIsRecognizing
+                });
+              }}
+            >
+              {isRecognizing ? "Scanning..." : "Scan photo with OCR"}
+            </button>
+          </>
+        ) : null}
+        {ocrText ? <p>OCR text: {ocrText}</p> : null}
+        {camera.error ? <p className="field-error">{camera.error}</p> : null}
+        {ocrError ? <p className="field-error">{ocrError}</p> : null}
+      </div>
       {winErrors.map((error) => (
         <p className="field-error" key={error}>
           {error}
@@ -189,6 +240,34 @@ export function HandResultFlow({
       <button onClick={onClose}>Cancel</button>
     </section>
   );
+}
+
+async function applyOcrResult(input: {
+  image: string;
+  setConcealedTiles: (tiles: Tile[]) => void;
+  setWinningTile: (tile: Tile | null) => void;
+  setOcrText: (text: string | null) => void;
+  setOcrError: (error: string | null) => void;
+  setIsRecognizing: (isRecognizing: boolean) => void;
+}) {
+  input.setOcrError(null);
+  input.setIsRecognizing(true);
+
+  try {
+    const result = await recognizeTileCodesFromImage(input.image);
+    input.setOcrText(result.text.trim() || "(no text)");
+    if (result.tiles.length === 0) {
+      input.setOcrError("OCR did not find tile codes. Enter or correct the tiles manually.");
+      return;
+    }
+
+    input.setConcealedTiles(result.tiles.slice(0, 13));
+    input.setWinningTile(result.tiles[13] ?? null);
+  } catch {
+    input.setOcrError("OCR could not read this photo. Enter or correct the tiles manually.");
+  } finally {
+    input.setIsRecognizing(false);
+  }
 }
 
 async function applyScoredWin(input: {
