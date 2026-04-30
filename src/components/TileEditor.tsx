@@ -21,6 +21,7 @@ const NUMBER_TILES: Tile[] = [
 export function TileEditor({ tiles, onChange, label = "Tiles" }: TileEditorProps) {
   return (
     <div className="tile-editor" role="group" aria-label={label}>
+      <h3>{label}</h3>
       <div className="selected-tiles" aria-label={`${label} selected tiles`}>
         {tiles.map((tile, index) => (
           <span className="tile" key={`${tileLabel(tile)}-${index}`}>

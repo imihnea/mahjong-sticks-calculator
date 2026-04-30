@@ -35,6 +35,7 @@ export function HandResultFlow({
   const camera = useCameraCapture();
   const [concealedTiles, setConcealedTiles] = useState<Tile[]>([]);
   const [winningTile, setWinningTile] = useState<Tile | null>(null);
+  const [doraIndicators, setDoraIndicators] = useState<Tile[]>([]);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [ocrText, setOcrText] = useState<string | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
@@ -96,6 +97,7 @@ export function HandResultFlow({
   const winErrors = getWinEntryErrors(game, {
     concealedTiles,
     winningTile,
+    doraIndicators,
     winnerId,
     winType,
     discarderId
@@ -156,6 +158,9 @@ export function HandResultFlow({
           tiles={winningTile ? [winningTile] : []}
           onChange={(tiles) => setWinningTile(tiles.at(-1) ?? null)}
         />
+      </div>
+      <div className="tile-editor-field">
+        <TileEditor label="Dora indicators" tiles={doraIndicators} onChange={setDoraIndicators} />
       </div>
       <div className="camera-panel">
         <button type="button" onClick={() => void camera.start()}>
@@ -225,6 +230,7 @@ export function HandResultFlow({
             game,
             concealedTiles,
             winningTile,
+            doraIndicators,
             winnerId,
             winType,
             discarderId,
@@ -274,6 +280,7 @@ async function applyScoredWin(input: {
   game: GameState;
   concealedTiles: Tile[];
   winningTile: Tile | null;
+  doraIndicators: Tile[];
   winnerId: PlayerId;
   winType: WinType;
   discarderId: PlayerId;
@@ -288,6 +295,7 @@ async function applyScoredWin(input: {
   const entry = createProvisionalWinEntry(input.game, {
     concealedTiles: input.concealedTiles,
     winningTile: input.winningTile,
+    doraIndicators: input.doraIndicators,
     winnerId: input.winnerId,
     winType: input.winType,
     discarderId: input.discarderId
@@ -387,7 +395,14 @@ function previewAppliedPayments(game: GameState, payments: WinPayment[]): GameSt
 
 function getWinEntryErrors(
   game: GameState,
-  input: { concealedTiles: Tile[]; winningTile: Tile | null; winnerId: PlayerId; winType: WinType; discarderId: PlayerId }
+  input: {
+    concealedTiles: Tile[];
+    winningTile: Tile | null;
+    doraIndicators: Tile[];
+    winnerId: PlayerId;
+    winType: WinType;
+    discarderId: PlayerId;
+  }
 ): string[] {
   const provisionalEntry = createProvisionalWinEntry(game, input);
   if (!provisionalEntry) {
@@ -399,7 +414,14 @@ function getWinEntryErrors(
 
 function createProvisionalWinEntry(
   game: GameState,
-  input: { concealedTiles: Tile[]; winningTile: Tile | null; winnerId: PlayerId; winType: WinType; discarderId: PlayerId }
+  input: {
+    concealedTiles: Tile[];
+    winningTile: Tile | null;
+    doraIndicators: Tile[];
+    winnerId: PlayerId;
+    winType: WinType;
+    discarderId: PlayerId;
+  }
 ): WinEntry | null {
   if (!input.winningTile) {
     return null;
@@ -417,7 +439,7 @@ function createProvisionalWinEntry(
     winningTile: input.winningTile,
     concealedTiles: input.concealedTiles,
     melds: [],
-    doraIndicators: [],
+    doraIndicators: input.doraIndicators,
     uraDoraIndicators: [],
     conditions: []
   };

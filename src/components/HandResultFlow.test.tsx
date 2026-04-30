@@ -12,6 +12,9 @@ describe("HandResultFlow", () => {
 
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Open camera" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Concealed tiles" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Winning tile" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dora indicators" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Photo reference (not saved)")).not.toBeInTheDocument();
 
     chooseTiles("Concealed tiles", ["2m", "3m", "4m", "2p", "3p", "4p", "2s", "3s", "4s", "6m", "7m", "8m", "1z"]);
@@ -84,6 +87,26 @@ describe("HandResultFlow", () => {
       );
     });
     expect(onApplyWin.mock.calls[0]?.[1]?.[0]).not.toHaveProperty("discarderId");
+  });
+
+  it("passes selected dora indicators into the scored win entry", async () => {
+    const onApplyWin = createOnApplyWinMock();
+    renderWinFlow({ onApplyWin });
+
+    fireEvent.click(within(screen.getByRole("group", { name: "Winner" })).getByRole("button", { name: "C" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Discarder" })).getByRole("button", { name: "A" }));
+    chooseTiles("Concealed tiles", ["3m", "4m", "6m", "7m", "8m", "2p", "3p", "4p", "3s", "4s", "5s", "5s", "5s"]);
+    chooseTiles("Winning tile", ["2m"]);
+    chooseTiles("Dora indicators", ["1m"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(onApplyWin).toHaveBeenCalled();
+    });
+    expect(onApplyWin.mock.calls[0]?.[1]?.[0]).toMatchObject({
+      doraIndicators: [{ suit: "man", value: 1 }]
+    });
   });
 
   it("lets the user mark any combination of exhaustive draw tenpai players", () => {
