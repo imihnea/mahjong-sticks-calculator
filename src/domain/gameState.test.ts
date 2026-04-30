@@ -93,7 +93,10 @@ describe("gameState", () => {
   it("clears riichi sticks after a win", async () => {
     const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
     const withRiichi = declareRiichi(game, game.players[1].id);
-    const next = applyWin(withRiichi, [{ winnerIndex: 2, payerIndexes: [0], amount: 8000 }]);
+    const next = applyWin(withRiichi, [
+      { winnerIndex: 2, payerIndexes: [0], amount: 8000 },
+      { winnerIndex: 2, payerIndexes: [], amount: 1000 }
+    ]);
     expect(next.riichiSticks).toBe(0);
     expect(next.honba).toBe(0);
   });
@@ -121,6 +124,20 @@ describe("gameState", () => {
         { winnerIndex: 1, payerIndexes: [], amount: 1000 }
       ])
     ).toThrow("Riichi pool payment cannot exceed the riichi sticks on the table.");
+
+    const withTwoRiichi = declareRiichi(declareRiichi(game, game.players[2].id), game.players[3].id);
+    expect(() =>
+      applyWin(withTwoRiichi, [
+        { winnerIndex: 1, payerIndexes: [0], amount: 8000 },
+        { winnerIndex: 1, payerIndexes: [], amount: 1000 }
+      ])
+    ).toThrow("Riichi pool payment must equal the riichi sticks on the table.");
+    expect(() =>
+      applyWin(withTwoRiichi, [
+        { winnerIndex: 1, payerIndexes: [0], amount: 8000 },
+        { winnerIndex: 0, payerIndexes: [], amount: 2000 }
+      ])
+    ).toThrow("Riichi pool recipient must be a winning player.");
     expect(game.handNumber).toBe(1);
     expect(game.riichiSticks).toBe(0);
   });

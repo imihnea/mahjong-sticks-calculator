@@ -101,7 +101,7 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
 export function applyWin(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): GameState {
   validateWinPayments(game, payments);
 
-  const dealerWon = payments.some((payment) => payment.winnerIndex === game.dealerIndex);
+  const dealerWon = payments.some((payment) => payment.payerIndexes.length > 0 && payment.winnerIndex === game.dealerIndex);
   const dealerIndex = rotateDealerAfterHand(game.dealerIndex, dealerWon);
   const roundProgression = advanceRound(game, dealerWon);
   const players = game.players.map((player, index) => {
@@ -138,6 +138,7 @@ export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): 
 function validateWinPayments(game: GameState, payments: Array<{ winnerIndex: number; payerIndexes: number[]; amount: number }>): void {
   let playerPaymentCount = 0;
   let riichiPoolPayment = 0;
+  const realWinnerIndexes = new Set<number>();
 
   for (const payment of payments) {
     assertSeatIndex(payment.winnerIndex);
@@ -160,8 +161,10 @@ function validateWinPayments(game: GameState, payments: Array<{ winnerIndex: num
 
     if (payment.payerIndexes.length === 0) {
       riichiPoolPayment += payment.amount;
+      continue;
     } else {
       playerPaymentCount += 1;
+      realWinnerIndexes.add(payment.winnerIndex);
     }
   }
 
@@ -169,8 +172,19 @@ function validateWinPayments(game: GameState, payments: Array<{ winnerIndex: num
     throw new Error("Win payments must include at least one player payment.");
   }
 
-  if (riichiPoolPayment > game.riichiSticks * 1000) {
+  for (const payment of payments) {
+    if (payment.payerIndexes.length === 0 && !realWinnerIndexes.has(payment.winnerIndex)) {
+      throw new Error("Riichi pool recipient must be a winning player.");
+    }
+  }
+
+  const expectedRiichiPoolPayment = game.riichiSticks * 1000;
+  if (riichiPoolPayment > expectedRiichiPoolPayment) {
     throw new Error("Riichi pool payment cannot exceed the riichi sticks on the table.");
+  }
+
+  if (riichiPoolPayment !== expectedRiichiPoolPayment) {
+    throw new Error("Riichi pool payment must equal the riichi sticks on the table.");
   }
 }
 
