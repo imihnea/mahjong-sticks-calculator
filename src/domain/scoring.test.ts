@@ -133,6 +133,15 @@ describe("scoring adapter", () => {
     });
     await expect(scoreWinEntry(tsumoEntry)).resolves.not.toHaveProperty("ronPayment");
   });
+
+  it("rejects invalid runtime win type shapes", async () => {
+    const invalidWinType = { ...baseWinEntry, winType: "draw" } as unknown as WinEntry;
+    expect(validateWinEntry(invalidWinType)).toContain("Win type must be ron or tsumo.");
+    await expect(scoreWinEntry(invalidWinType)).rejects.toThrow("Win type must be ron or tsumo.");
+
+    const tsumoWithDiscarder = { ...baseWinEntry, winType: "tsumo" } as unknown as WinEntry;
+    expect(validateWinEntry(tsumoWithDiscarder)).toContain("Tsumo must not include a discarder.");
+  });
 });
 
 function repeatTile(tile: Tile, count: number): Tile[] {

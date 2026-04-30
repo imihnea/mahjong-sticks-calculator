@@ -27,8 +27,12 @@ export function validateWinEntry(entry: WinEntry): string[] {
   const effectiveTileCount =
     entry.concealedTiles.length + 1 + entry.melds.reduce((total, meld) => total + effectiveMeldTileCount(meld.type), 0);
 
-  if (entry.winType === "ron" && !entry.discarderId) {
+  if (!isWinType(entry.winType)) {
+    errors.push("Win type must be ron or tsumo.");
+  } else if (entry.winType === "ron" && !entry.discarderId) {
     errors.push("Ron requires a discarder.");
+  } else if (entry.winType === "tsumo" && "discarderId" in entry && entry.discarderId !== undefined) {
+    errors.push("Tsumo must not include a discarder.");
   }
 
   for (const tile of tiles) {
@@ -101,9 +105,15 @@ export async function scoreWinEntry(entry: WinEntry): Promise<ScoreBreakdown> {
     fu: 30
   };
 
-  return entry.winType === "ron"
-    ? { ...base, paymentKind: "ron", ronPayment: 1000 }
-    : { ...base, paymentKind: "tsumo", dealerTsumoPayment: 500, childTsumoPayment: 300 };
+  if (entry.winType === "ron") {
+    return { ...base, paymentKind: "ron", ronPayment: 1000 };
+  }
+
+  if (entry.winType === "tsumo") {
+    return { ...base, paymentKind: "tsumo", dealerTsumoPayment: 500, childTsumoPayment: 300 };
+  }
+
+  throw new Error("Win type must be ron or tsumo.");
 }
 
 function tileKey(tile: Tile): string {
@@ -175,4 +185,8 @@ function isTileSuit(suit: string): suit is Tile["suit"] {
 
 function isMeldType(type: string): type is WinEntry["melds"][number]["type"] {
   return type === "chi" || type === "pon" || type === "open-kan" || type === "closed-kan" || type === "added-kan";
+}
+
+function isWinType(winType: string): winType is WinType {
+  return winType === "ron" || winType === "tsumo";
 }
