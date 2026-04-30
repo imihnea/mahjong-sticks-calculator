@@ -21,6 +21,8 @@ describe("gameState", () => {
     expect(next.currentDice?.diceTotal).toBe(6);
     expect(next.players.map((player) => player.score)).toEqual(startingScores);
     expect(next.history.at(-1)?.type).toBe("dice");
+    expect(next.undoStack.at(-1)?.currentDice).toBeUndefined();
+    expect(next.undoStack.at(-1)?.history).toEqual([]);
   });
 
   it("prevents riichi below 1000 and otherwise deposits a stick", () => {
@@ -36,6 +38,21 @@ describe("gameState", () => {
     expect(afterRiichi.riichiSticks).toBe(1);
     expect(afterRiichi.history.at(-1)).toEqual({ type: "riichi", playerId: game.players[1].id });
     expect(() => declareRiichi(brokeGame, game.players[2].id)).toThrow("A player under 1000 points cannot declare riichi.");
+    expect(() => declareRiichi(afterRiichi, game.players[1].id)).toThrow("Player has already declared riichi.");
+    expect(() => declareRiichi(game, "missing")).toThrow("Player not found.");
+  });
+
+  it("allows riichi at exactly 1000 points", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+    const exactGame = {
+      ...game,
+      players: game.players.map((player, index) => (index === 2 ? { ...player, score: 1000 } : player))
+    };
+
+    const next = declareRiichi(exactGame, game.players[2].id);
+
+    expect(next.players[2].score).toBe(0);
+    expect(next.riichiSticks).toBe(1);
   });
 
   it("rotates dealer after non-tenpai dealer exhaustive draw", () => {
@@ -44,6 +61,8 @@ describe("gameState", () => {
     const next = applyExhaustiveDraw(game, [game.players[1].id]);
 
     expect(next.dealerIndex).toBe(1);
+    expect(next.handNumber).toBe(2);
+    expect(next.roundWind).toBe("east");
     expect(next.players[1].seatWind).toBe("east");
     expect(next.honba).toBe(1);
     expect(next.currentDice).toBeUndefined();
@@ -57,7 +76,26 @@ describe("gameState", () => {
     const next = applyExhaustiveDraw(game, [game.players[0].id]);
 
     expect(next.dealerIndex).toBe(0);
+    expect(next.handNumber).toBe(1);
     expect(next.players[0].seatWind).toBe("east");
+  });
+
+  it("advances round wind after four dealer rotations", () => {
+    const game = createNewGame({ gameLength: "south", playerNames: ["A", "B", "C", "D"] });
+    const east2 = applyExhaustiveDraw(game, [game.players[1].id]);
+    const east3 = applyExhaustiveDraw(east2, [east2.players[2].id]);
+    const east4 = applyExhaustiveDraw(east3, [east3.players[3].id]);
+    const south1 = applyExhaustiveDraw(east4, [east4.players[1].id]);
+
+    expect(south1.roundWind).toBe("south");
+    expect(south1.handNumber).toBe(1);
+  });
+
+  it("rejects invalid or duplicate tenpai players", () => {
+    const game = createNewGame({ gameLength: "east", playerNames: ["A", "B", "C", "D"] });
+
+    expect(() => applyExhaustiveDraw(game, ["missing"])).toThrow("Player not found.");
+    expect(() => applyExhaustiveDraw(game, [game.players[1].id, game.players[1].id])).toThrow("Tenpai players must be unique.");
   });
 
   it("keeps dealer on abortive draw", () => {

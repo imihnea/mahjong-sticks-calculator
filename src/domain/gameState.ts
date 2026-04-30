@@ -41,7 +41,7 @@ export function createNewGame(input: NewGameInput): GameState {
 export function applyDiceRoll(game: GameState, dice: { die1: number; die2: number }): GameState {
   const currentDice = calculateWallBreak({ dealerIndex: game.dealerIndex, die1: dice.die1, die2: dice.die2 });
 
-  return withSnapshot({
+  return withSnapshot(game, {
     ...game,
     currentDice,
     history: [...game.history, { type: "dice", dice: currentDice }]
@@ -51,11 +51,14 @@ export function applyDiceRoll(game: GameState, dice: { die1: number; die2: numbe
 export function declareRiichi(game: GameState, playerId: PlayerId): GameState {
   const player = game.players.find((candidate) => candidate.id === playerId);
   if (!player) throw new Error("Player not found.");
+  if (player.riichi) {
+    throw new Error("Player has already declared riichi.");
+  }
   if (player.score < MAHJONG_SOUL_RANKED_4P.riichiMinimumScore) {
     throw new Error("A player under 1000 points cannot declare riichi.");
   }
 
-  return withSnapshot({
+  return withSnapshot(game, {
     ...game,
     riichiSticks: game.riichiSticks + 1,
     players: game.players.map((candidate) =>
@@ -66,6 +69,10 @@ export function declareRiichi(game: GameState, playerId: PlayerId): GameState {
 }
 
 export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]): GameState {
+  if (new Set(tenpaiPlayerIds).size !== tenpaiPlayerIds.length) {
+    throw new Error("Tenpai players must be unique.");
+  }
+
   const tenpaiIndexes = tenpaiPlayerIds.map((id) => {
     const playerIndex = game.players.findIndex((player) => player.id === id);
     if (playerIndex === -1) throw new Error("Player not found.");
@@ -74,21 +81,25 @@ export function applyExhaustiveDraw(game: GameState, tenpaiPlayerIds: PlayerId[]
   const deltas = exhaustiveDrawDeltas(tenpaiIndexes, game.players.length);
   const dealerContinues = tenpaiIndexes.includes(game.dealerIndex);
   const dealerIndex = rotateDealerAfterHand(game.dealerIndex, dealerContinues);
+  const roundProgression = advanceRound(game, dealerContinues);
+  const tenpaiPlayerIdsSnapshot = [...tenpaiPlayerIds];
 
   return withSnapshot(
+    game,
     refreshSeats({
       ...game,
+      ...roundProgression,
       dealerIndex,
       honba: game.honba + 1,
       players: applyDeltas(game.players, deltas),
       currentDice: undefined,
-      history: [...game.history, { type: "exhaustive-draw", tenpaiPlayerIds }]
+      history: [...game.history, { type: "exhaustive-draw", tenpaiPlayerIds: tenpaiPlayerIdsSnapshot }]
     })
   );
 }
 
 export function applyAbortiveDraw(game: GameState, drawType: AbortiveDrawType): GameState {
-  return withSnapshot({
+  return withSnapshot(game, {
     ...game,
     honba: game.honba + 1,
     currentDice: undefined,
@@ -114,22 +125,45 @@ function refreshSeats(game: GameState): GameState {
   };
 }
 
-function withSnapshot(game: GameState): GameState {
-  const snapshot: GameStateSnapshot = {
+function advanceRound(game: GameState, dealerContinues: boolean): Pick<GameState, "roundWind" | "handNumber"> {
+  if (dealerContinues) {
+    return { roundWind: game.roundWind, handNumber: game.handNumber };
+  }
+
+  if (game.handNumber < 4) {
+    return { roundWind: game.roundWind, handNumber: game.handNumber + 1 };
+  }
+
+  if (game.roundWind === "east") {
+    return { roundWind: "south", handNumber: 1 };
+  }
+
+  if (game.roundWind === "south") {
+    return { roundWind: "west", handNumber: 1 };
+  }
+
+  return { roundWind: game.roundWind, handNumber: game.handNumber };
+}
+
+function withSnapshot(previousGame: GameState, nextGame: GameState): GameState {
+  const snapshot = toSnapshot(previousGame);
+  return { ...nextGame, undoStack: [...previousGame.undoStack, snapshot] };
+}
+
+function toSnapshot(game: GameState): GameStateSnapshot {
+  return {
     id: game.id,
     gameLength: game.gameLength,
-    players: game.players,
+    players: game.players.map((player) => ({ ...player })),
     dealerIndex: game.dealerIndex,
     roundWind: game.roundWind,
     handNumber: game.handNumber,
     honba: game.honba,
     riichiSticks: game.riichiSticks,
-    currentDice: game.currentDice,
-    history: game.history,
+    currentDice: game.currentDice ? { ...game.currentDice, countPath: [...game.currentDice.countPath] } : undefined,
+    history: structuredClone(game.history),
     ended: game.ended
   };
-
-  return { ...game, undoStack: [...game.undoStack, snapshot] };
 }
 
 function createId(prefix: string): string {
