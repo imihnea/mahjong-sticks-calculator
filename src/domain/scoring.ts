@@ -1,24 +1,44 @@
 import type { Tile, WinEntry, WinType } from "./types";
 
-export interface ScoreBreakdown {
+type LimitLabel = "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman" | "double-yakuman" | "triple-yakuman";
+
+interface BaseScoreBreakdown {
   yaku: string[];
   han: number;
   fu: number;
-  limit?: "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman" | "double-yakuman" | "triple-yakuman";
-  ronPayment?: number;
-  dealerTsumoPayment?: number;
-  childTsumoPayment?: number;
+  limit?: LimitLabel;
 }
+
+export type ScoreBreakdown =
+  | (BaseScoreBreakdown & {
+      paymentKind: "ron";
+      ronPayment: number;
+    })
+  | (BaseScoreBreakdown & {
+      paymentKind: "tsumo";
+      dealerTsumoPayment: number;
+      childTsumoPayment: number;
+    });
 
 export function validateWinEntry(entry: WinEntry): string[] {
   const errors: string[] = [];
   const tiles = [...entry.concealedTiles, entry.winningTile, ...entry.melds.flatMap((meld) => meld.tiles)];
+  const effectiveTileCount =
+    entry.concealedTiles.length + 1 + entry.melds.reduce((total, meld) => total + effectiveMeldTileCount(meld.type), 0);
 
   if (entry.winType === "ron" && !entry.discarderId) {
     errors.push("Ron requires a discarder.");
   }
 
-  if (tiles.length !== 14) {
+  for (const tile of tiles) {
+    errors.push(...validateTile(tile));
+  }
+
+  for (const meld of entry.melds) {
+    errors.push(...validateMeld(meld));
+  }
+
+  if (effectiveTileCount !== 14) {
     errors.push("A complete winning hand must contain 14 tiles including the winning tile.");
   }
 
@@ -32,25 +52,32 @@ export function validateWinEntry(entry: WinEntry): string[] {
     errors.push("A physical tile cannot appear more than four times.");
   }
 
+  const redFiveCounts = new Map<string, number>();
+  for (const tile of tiles) {
+    if (!tile.red) continue;
+    redFiveCounts.set(tile.suit, (redFiveCounts.get(tile.suit) ?? 0) + 1);
+  }
+
+  if ([...redFiveCounts.values()].some((count) => count > 1)) {
+    errors.push("A suit can have at most one red five.");
+  }
+
   return errors;
 }
 
 export function scoreManualLimitHand(input: {
-  label: NonNullable<ScoreBreakdown["limit"]>;
+  label: "mangan";
   dealer: boolean;
   winType: WinType;
 }): ScoreBreakdown {
-  if (input.label !== "mangan") {
-    throw new Error("Only mangan manual fallback is implemented in the MVP boundary.");
-  }
-
   return input.winType === "ron"
-    ? { yaku: ["Manual mangan"], han: 5, fu: 0, limit: "mangan", ronPayment: input.dealer ? 12000 : 8000 }
+    ? { yaku: ["Manual mangan"], han: 5, fu: 0, limit: input.label, paymentKind: "ron", ronPayment: input.dealer ? 12000 : 8000 }
     : {
         yaku: ["Manual mangan"],
         han: 5,
         fu: 0,
-        limit: "mangan",
+        limit: input.label,
+        paymentKind: "tsumo",
         dealerTsumoPayment: input.dealer ? 4000 : 4000,
         childTsumoPayment: input.dealer ? 4000 : 2000
       };
@@ -63,16 +90,69 @@ export async function scoreWinEntry(entry: WinEntry): Promise<ScoreBreakdown> {
     throw new Error(errors.join(" "));
   }
 
-  return {
+  const base = {
     yaku: entry.conditions.includes("riichi") ? ["Riichi"] : [],
     han: entry.conditions.includes("riichi") ? 1 : 0,
-    fu: 30,
-    ronPayment: 1000,
-    dealerTsumoPayment: 500,
-    childTsumoPayment: 300
+    fu: 30
   };
+
+  return entry.winType === "ron"
+    ? { ...base, paymentKind: "ron", ronPayment: 1000 }
+    : { ...base, paymentKind: "tsumo", dealerTsumoPayment: 500, childTsumoPayment: 300 };
 }
 
 function tileKey(tile: Tile): string {
   return `${tile.suit}-${tile.value}`;
+}
+
+function validateTile(tile: Tile): string[] {
+  const errors: string[] = [];
+
+  if (tile.suit === "honor") {
+    if (!Number.isInteger(tile.value) || tile.value < 1 || tile.value > 7) {
+      errors.push("Honor tiles must have value 1-7.");
+    }
+  } else if (!Number.isInteger(tile.value) || tile.value < 1 || tile.value > 9) {
+    errors.push("Suit tiles must have value 1-9.");
+  }
+
+  if (tile.red && (tile.suit === "honor" || tile.value !== 5)) {
+    errors.push("Only suit fives can be red.");
+  }
+
+  return errors;
+}
+
+function validateMeld(meld: WinEntry["melds"][number]): string[] {
+  const errors: string[] = [];
+  const expectedCount = meld.type === "open-kan" || meld.type === "closed-kan" || meld.type === "added-kan" ? 4 : 3;
+
+  if (meld.tiles.length !== expectedCount) {
+    const label = meld.type === "pon" ? "Pon" : meld.type === "chi" ? "Chi" : "Kan";
+    errors.push(`${label} melds must contain exactly ${expectedCount} tiles.`);
+  }
+
+  if (meld.type === "chi") {
+    if (meld.tiles.some((tile) => tile.suit === "honor")) {
+      errors.push("Chi melds must use suited tiles.");
+    }
+    const [firstSuit] = meld.tiles;
+    const sortedValues = meld.tiles.map((tile) => tile.value).sort((a, b) => a - b);
+    const sameSuit = meld.tiles.every((tile) => tile.suit === firstSuit.suit);
+    const sequential = sortedValues.length === 3 && sortedValues[0] + 1 === sortedValues[1] && sortedValues[1] + 1 === sortedValues[2];
+    if (!sameSuit || !sequential) {
+      errors.push("Chi melds must be three sequential suited tiles.");
+    }
+  } else if (meld.tiles.length > 0) {
+    const key = tileKey(meld.tiles[0]);
+    if (!meld.tiles.every((tile) => tileKey(tile) === key)) {
+      errors.push("Pon and kan melds must contain identical tiles.");
+    }
+  }
+
+  return errors;
+}
+
+function effectiveMeldTileCount(type: WinEntry["melds"][number]["type"]): number {
+  return type === "open-kan" || type === "closed-kan" || type === "added-kan" ? 3 : 3;
 }

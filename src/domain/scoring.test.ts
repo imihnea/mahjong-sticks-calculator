@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { scoreManualLimitHand, validateWinEntry } from "./scoring";
-import type { WinEntry } from "./types";
+import { scoreManualLimitHand, scoreWinEntry, validateWinEntry } from "./scoring";
+import type { Meld, Tile, WinEntry } from "./types";
 
 const baseWinEntry: WinEntry = {
   winnerId: "p1",
@@ -49,4 +49,87 @@ describe("scoring adapter", () => {
       ronPayment: 8000
     });
   });
+
+  it("accepts kan hands as 14 effective tiles", () => {
+    const kanEntry: WinEntry = {
+      ...baseWinEntry,
+      winningTile: { suit: "sou", value: 7 },
+      concealedTiles: [
+        { suit: "pin", value: 2 },
+        { suit: "pin", value: 3 },
+        { suit: "pin", value: 4 },
+        { suit: "sou", value: 2 },
+        { suit: "sou", value: 3 },
+        { suit: "sou", value: 4 },
+        { suit: "man", value: 6 },
+        { suit: "man", value: 7 },
+        { suit: "man", value: 8 },
+        { suit: "honor", value: 1 }
+      ],
+      melds: [{ type: "closed-kan", tiles: repeatTile({ suit: "man", value: 1 }, 4) }]
+    };
+
+    expect(validateWinEntry(kanEntry)).toEqual([]);
+  });
+
+  it("rejects malformed tiles and red fives", () => {
+    expect(validateWinEntry(withWinningTile({ suit: "honor", value: 8 }))).toContain("Honor tiles must have value 1-7.");
+    expect(validateWinEntry(withWinningTile({ suit: "man", value: 0 }))).toContain("Suit tiles must have value 1-9.");
+    expect(validateWinEntry(withWinningTile({ suit: "honor", value: 1, red: true }))).toContain("Only suit fives can be red.");
+    expect(validateWinEntry(withWinningTile({ suit: "pin", value: 4, red: true }))).toContain("Only suit fives can be red.");
+
+    const duplicateRed: WinEntry = {
+      ...baseWinEntry,
+      winningTile: { suit: "man", value: 5, red: true },
+      concealedTiles: [
+        { suit: "man", value: 5, red: true },
+        ...baseWinEntry.concealedTiles.slice(1)
+      ]
+    };
+    expect(validateWinEntry(duplicateRed)).toContain("A suit can have at most one red five.");
+  });
+
+  it("rejects malformed melds", () => {
+    expect(validateWinEntry(withMeld({ type: "pon", tiles: repeatTile({ suit: "man", value: 2 }, 2) }))).toContain(
+      "Pon melds must contain exactly 3 tiles."
+    );
+    expect(validateWinEntry(withMeld({ type: "open-kan", tiles: repeatTile({ suit: "sou", value: 4 }, 3) }))).toContain(
+      "Kan melds must contain exactly 4 tiles."
+    );
+    expect(validateWinEntry(withMeld({ type: "chi", tiles: repeatTile({ suit: "honor", value: 1 }, 3) }))).toContain(
+      "Chi melds must use suited tiles."
+    );
+  });
+
+  it("returns only relevant payment fields for the win type", async () => {
+    await expect(scoreWinEntry(baseWinEntry)).resolves.toMatchObject({
+      paymentKind: "ron",
+      ronPayment: 1000
+    });
+    await expect(scoreWinEntry(baseWinEntry)).resolves.not.toHaveProperty("dealerTsumoPayment");
+
+    const tsumoEntry: WinEntry = {
+      ...baseWinEntry,
+      winType: "tsumo",
+      discarderId: undefined
+    };
+    await expect(scoreWinEntry(tsumoEntry)).resolves.toMatchObject({
+      paymentKind: "tsumo",
+      dealerTsumoPayment: 500,
+      childTsumoPayment: 300
+    });
+    await expect(scoreWinEntry(tsumoEntry)).resolves.not.toHaveProperty("ronPayment");
+  });
 });
+
+function repeatTile(tile: Tile, count: number): Tile[] {
+  return Array.from({ length: count }, () => ({ ...tile }));
+}
+
+function withWinningTile(winningTile: Tile): WinEntry {
+  return { ...baseWinEntry, winningTile };
+}
+
+function withMeld(meld: Meld): WinEntry {
+  return { ...baseWinEntry, melds: [meld] };
+}
